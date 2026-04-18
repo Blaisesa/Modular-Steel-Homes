@@ -3,9 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Modular Online Builder</title>
+    <title>PIR Configurator 3D</title>
+    <link rel="stylesheet" href="assets/css/styles.css">
 </head>
 <body>
+    <div id="builder-viewport"></div>
     
+    <div class="controls">
+        <button onclick="rotateTo('front')">Front</button>
+        <button onclick="rotateTo('back')">Back</button>
+        <button onclick="rotateTo('left')">Left</button>
+        <button onclick="rotateTo('right')">Right</button>
+        <button onclick="rotateTo('top')">Top</button>
+        <button onclick="rotateTo('iso')">3D View</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="assets/js/main.js"></script>
 </body>
 </html>
