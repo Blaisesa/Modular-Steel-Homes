@@ -88,21 +88,18 @@ function updateBuilding() {
             wallGeo.translate(-W / 2, 0, D / 2);
             addMeshWithEdges(wallGeo, wallMaterial, edgeMaterial, buildingGroup);
 
-            // Refined Apex Calculation to prevent overlapping at the ridge
             const roofThickness = 0.1;
             const angle = Math.atan2(peakHeight, D / 2);
             const roofHalfWidth = (D / 2) / Math.cos(angle) + roofOverhang;
             const roofPlateGeo = new THREE.BoxGeometry(W + (roofOverhang * 2), roofThickness, roofHalfWidth);
 
-            // Left Slope
-            const roofL = new THREE.Mesh(roofPlateGeo, roofMaterial);
-            // Position offset helps the top edges meet flush without clipping
             const xOffset = (D / 3.90) + (roofOverhang / 4);
+
+            const roofL = new THREE.Mesh(roofPlateGeo, roofMaterial);
             roofL.position.set(0, H + (peakHeight / 2) + (roofThickness / 2), xOffset);
             roofL.rotation.x = angle;
             buildingGroup.add(roofL);
 
-            // Right Slope
             const roofR = new THREE.Mesh(roofPlateGeo, roofMaterial);
             roofR.position.set(0, H + (peakHeight / 2) + (roofThickness / 2), -xOffset);
             roofR.rotation.x = -angle;
@@ -238,18 +235,46 @@ window.rotateTo = function(view) {
 };
 
 function setupInputs(container) {
-    const start = (x, y) => { if (isFreeRoam) { isDragging = true; previousX = x; previousY = y; } };
+    const start = (x, y) => { 
+        if (isFreeRoam) { 
+            isDragging = true; 
+            previousX = x; 
+            previousY = y; 
+        } 
+    };
+
     const move = (x, y) => {
         if (!isDragging || !isFreeRoam) return;
         targetAngle += (x - previousX) * 0.005;
         targetVerticalAngle += (y - previousY) * 0.005;
         targetVerticalAngle = Math.max(-1.4, Math.min(1.4, targetVerticalAngle));
-        previousX = x; previousY = y;
+        previousX = x; 
+        previousY = y;
     };
+
+    // Desktop
     container.addEventListener('mousedown', (e) => start(e.clientX, e.clientY));
     window.addEventListener('mousemove', (e) => move(e.clientX, e.clientY));
     window.addEventListener('mouseup', () => isDragging = false);
-    container.addEventListener('wheel', (e) => { e.preventDefault(); radius = Math.max(5, Math.min(25, radius + (e.deltaY > 0 ? 0.5 : -0.5))); }, { passive: false });
+
+    // Mobile Support
+    container.addEventListener('touchstart', (e) => {
+        const touch = e.touches[0];
+        start(touch.clientX, touch.clientY);
+    }, { passive: false });
+
+    window.addEventListener('touchmove', (e) => {
+        if (isDragging && isFreeRoam) e.preventDefault(); // Stop scrolling while rotating
+        const touch = e.touches[0];
+        move(touch.clientX, touch.clientY);
+    }, { passive: false });
+
+    window.addEventListener('touchend', () => isDragging = false);
+
+    container.addEventListener('wheel', (e) => { 
+        e.preventDefault(); 
+        radius = Math.max(5, Math.min(25, radius + (e.deltaY > 0 ? 0.5 : -0.5))); 
+    }, { passive: false });
 }
 
 function animate() {
