@@ -39,6 +39,7 @@
                         </div>
                     </div>
                 </div>
+
                 <div class="nav-section">
                     <div class="nav-header" onclick="toggleSection(this)">
                         <span>Roof Style</span>
@@ -53,15 +54,21 @@
                         </div>
                     </div>
                 </div>
+
                 <div class="nav-section">
                     <div class="nav-header" onclick="toggleSection(this)">
                         <span>Dimensions</span>
                         <span class="chevron">▼</span>
                     </div>
                     <div class="nav-content">
-                        <p style="padding:20px; font-size: 13px; color: #666;">
-                            Adjustments will appear here.
-                        </p>
+                        <div class="control-group">
+                            <label>Width: <span id="val-w">6</span>m</label>
+                            <input type="range" min="3" max="12" step="0.5" value="6" oninput="updateDim('W', this.value)">
+                        </div>
+                        <div class="control-group">
+                            <label>Depth: <span id="val-d">4</span>m</label>
+                            <input type="range" min="3" max="10" step="0.5" value="4" oninput="updateDim('D', this.value)">
+                        </div>
                     </div>
                 </div>
             </nav>
