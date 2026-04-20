@@ -1,21 +1,28 @@
+// Main JavaScript file for the building viewer using Three.js
 let scene, camera, renderer, building;
 let currentAngle = -Math.PI / 4; 
 let targetAngle = -Math.PI / 4; 
 let currentVerticalAngle = 0.25; 
 let targetVerticalAngle = 0.25;
 
+// Camera settings
 const radius = 12; 
 const lerpSpeed = 0.08; 
 const W = 6, H = 2.5, D = 4;
 
+// Initialize the Three.js scene, camera, renderer, and building mesh
 function init() {
+    const container = document.getElementById('builder-viewport');
+    
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0xf4f4f4);
 
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    // Camera aspect ratio based on container width
+    camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+    
     renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.getElementById('builder-viewport').appendChild(renderer.domElement);
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    container.appendChild(renderer.domElement);
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.7));
     const light = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -39,6 +46,7 @@ function init() {
     animate();
 }
 
+// Function to rotate the camera to a specific view
 window.rotateTo = function(view) {
     const views = {
         'front': { h: 0, v: 0 },
@@ -54,6 +62,7 @@ window.rotateTo = function(view) {
     }
 }
 
+// Animate the camera to smoothly transition to the target angles
 function animate() {
     requestAnimationFrame(animate);
     currentAngle += (targetAngle - currentAngle) * lerpSpeed;
@@ -67,10 +76,12 @@ function animate() {
     renderer.render(scene, camera);
 }
 
+// Handle window resize
 window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
+    const container = document.getElementById('builder-viewport');
+    camera.aspect = container.clientWidth / container.clientHeight;
     camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(container.clientWidth, container.clientHeight);
 });
 
 init();
