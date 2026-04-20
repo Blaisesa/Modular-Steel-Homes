@@ -1,4 +1,4 @@
-// Main JavaScript file for the building viewer using Three.js
+// Main JavaScript file for the building viewer
 let scene, camera, renderer, building;
 let currentAngle = -Math.PI / 4; 
 let targetAngle = -Math.PI / 4; 
@@ -48,69 +48,50 @@ function init() {
     building.position.y = H / 2;
     scene.add(building);
 
-    // Unified Input Handling (Desktop + Mobile)
-
-    const startAction = (x, y) => {
-        if (!isFreeRoam) return;
-        isDragging = true;
-        previousX = x;
-        previousY = y;
-    };
-
+    // --- Input Handling ---
+    const startAction = (x, y) => { if (isFreeRoam) { isDragging = true; previousX = x; previousY = y; } };
     const moveAction = (x, y) => {
         if (!isDragging || !isFreeRoam) return;
-        const deltaX = x - previousX;
-        const deltaY = y - previousY;
-
-        targetAngle += deltaX * 0.005; 
-        targetVerticalAngle += deltaY * 0.005;
-        targetVerticalAngle = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, targetVerticalAngle));
-
-        previousX = x;
-        previousY = y;
+        targetAngle += (x - previousX) * 0.005; 
+        targetVerticalAngle += (y - previousY) * 0.005;
+        targetVerticalAngle = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, targetVerticalAngle));
+        previousX = x; previousY = y;
     };
-
     const endAction = () => { isDragging = false; };
 
-    // Mouse Listeners
+    // Mouse events
     container.addEventListener('mousedown', (e) => startAction(e.clientX, e.clientY));
     window.addEventListener('mousemove', (e) => moveAction(e.clientX, e.clientY));
     window.addEventListener('mouseup', endAction);
 
-    // Touch Listeners (Mobile)
-    container.addEventListener('touchstart', (e) => {
-        // Prevent scrolling the whole page while rotating the building
-        if (isFreeRoam) e.preventDefault(); 
-        startAction(e.touches[0].clientX, e.touches[0].clientY);
-    }, { passive: false });
-
-    window.addEventListener('touchmove', (e) => {
-        if (isFreeRoam) e.preventDefault();
-        moveAction(e.touches[0].clientX, e.touches[0].clientY);
-    }, { passive: false });
-
+    // Touch events
+    container.addEventListener('touchstart', (e) => { if(isFreeRoam) e.preventDefault(); startAction(e.touches[0].clientX, e.touches[0].clientY); }, {passive: false});
+    window.addEventListener('touchmove', (e) => { if(isFreeRoam) e.preventDefault(); moveAction(e.touches[0].clientX, e.touches[0].clientY); }, {passive: false});
     window.addEventListener('touchend', endAction);
 
-    // Zoom (Wheel)
+    // Scroll to zoom
     container.addEventListener('wheel', (e) => {
         e.preventDefault();
-        const zoomSpeed = 0.5;
-        radius += e.deltaY > 0 ? zoomSpeed : -zoomSpeed;
-        radius = Math.max(5, Math.min(25, radius));
+        radius = Math.max(5, Math.min(25, radius + (e.deltaY > 0 ? 0.5 : -0.5)));
     }, { passive: false });
 
     animate();
 }
 
-window.toggleFreeRoam = function() {
-    isFreeRoam = !isFreeRoam;
-    const btn = document.getElementById('roam-toggle');
-    // Your updated logic: Unlocked when active
-    btn.innerHTML = isFreeRoam ? '🔓' : '🔒'; 
-    btn.style.background = isFreeRoam ? '#007bff' : 'white';
-    btn.style.color = isFreeRoam ? 'white' : 'black';
+// Toggle the sidebar visibility and update the overlay and button states
+window.toggleSidebar = function() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    const toggleBtn = document.getElementById('menu-toggle');
+    
+    sidebar.classList.toggle('open');
+    overlay.classList.toggle('active');
+    toggleBtn.classList.toggle('open');
+
+    setTimeout(() => { window.dispatchEvent(new Event('resize')); }, 300);
 }
 
+// Rotate the camera to predefined views based on the button clicked
 window.rotateTo = function(view) {
     const views = {
         'front': { h: 0, v: 0 },
@@ -126,23 +107,31 @@ window.rotateTo = function(view) {
     }
 }
 
-// Animate the camera to smoothly transition to the target angles
+// Toggle free roam mode, updating the button appearance accordingly
+window.toggleFreeRoam = function() {
+    isFreeRoam = !isFreeRoam;
+    const btn = document.getElementById('roam-toggle');
+    btn.innerHTML = isFreeRoam ? '🔓' : '🔒'; 
+    btn.style.background = isFreeRoam ? '#007bff' : 'white';
+    btn.style.color = isFreeRoam ? 'white' : 'black';
+}
+
+// Animate the scene, smoothly interpolating camera angles and updating its position
 function animate() {
     requestAnimationFrame(animate);
     currentAngle += (targetAngle - currentAngle) * lerpSpeed;
     currentVerticalAngle += (targetVerticalAngle - currentVerticalAngle) * lerpSpeed;
-
     camera.position.x = radius * Math.cos(currentVerticalAngle) * Math.sin(currentAngle);
     camera.position.z = radius * Math.cos(currentVerticalAngle) * Math.cos(currentAngle);
     camera.position.y = radius * Math.sin(currentVerticalAngle) + (H / 2);
-
     camera.lookAt(0, H / 2, 0);
     renderer.render(scene, camera);
 }
 
-// Handle window resize
+// Handle window resize to maintain aspect ratio and update renderer size
 window.addEventListener('resize', () => {
     const container = document.getElementById('builder-viewport');
+    if (!container) return;
     camera.aspect = container.clientWidth / container.clientHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(container.clientWidth, container.clientHeight);
