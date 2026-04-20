@@ -9,6 +9,7 @@ const lerpSpeed = 0.08;
 let W = 6, H = 2.5, D = 4;
 let currentShapeType = 'rectangle';
 let currentRoofType = 'pent'; 
+const roofOverhang = 0.2; // 20cm overhang on all sides
 
 function init() {
     const container = document.getElementById('builder-viewport');
@@ -31,7 +32,6 @@ function init() {
 }
 
 function updateBuilding() {
-    /* Clear existing building group */
     if (building) {
         scene.remove(building);
         building.traverse((child) => {
@@ -45,15 +45,16 @@ function updateBuilding() {
     const buildingGroup = new THREE.Group();
     const wallMaterial = new THREE.MeshLambertMaterial({ color: 0x707173 });
     const roofMaterial = new THREE.MeshLambertMaterial({ color: 0x333333 });
+    const slopeHeight = 0.3; 
 
     if (currentShapeType === 'rectangle') {
         if (currentRoofType === 'pent') {
-            /* PENT WALLS */
+            /* PENT WALLS (Rectangle) - Logic is already shape-based, so it slopes */
             const wallShape = new THREE.Shape();
             wallShape.moveTo(0, 0);
             wallShape.lineTo(D, 0);
             wallShape.lineTo(D, H);
-            wallShape.lineTo(0, H + 0.3);
+            wallShape.lineTo(0, H + slopeHeight);
             wallShape.lineTo(0, 0);
 
             const wallGeo = new THREE.ExtrudeGeometry(wallShape, { depth: W, bevelEnabled: false });
@@ -61,15 +62,15 @@ function updateBuilding() {
             wallGeo.translate(-W / 2, 0, D / 2);
             buildingGroup.add(new THREE.Mesh(wallGeo, wallMaterial));
 
-            /* PENT ROOF */
-            const roofGeo = new THREE.BoxGeometry(W + 0.4, 0.15, D + 0.4);
+            const roofGeo = new THREE.BoxGeometry(W + (roofOverhang * 2), 0.15, D + (roofOverhang * 2));
             const roof = new THREE.Mesh(roofGeo, roofMaterial);
-            roof.position.y = H + 0.25;
-            roof.rotation.x = -Math.atan2(0.3, D);
+            const angle = -Math.atan2(slopeHeight, D);
+            roof.position.y = H + (slopeHeight / 2) + 0.1;
+            roof.rotation.x = angle;
             buildingGroup.add(roof);
 
         } else if (currentRoofType === 'apex') {
-            /* APEX WALLS (Gabled) */
+            /* APEX Logic (Rectangle) - Same as previous stable version */
             const wallShape = new THREE.Shape();
             const peak = 0.6; 
             wallShape.moveTo(0, 0);
@@ -84,49 +85,94 @@ function updateBuilding() {
             wallGeo.translate(-W / 2, 0, D / 2);
             buildingGroup.add(new THREE.Mesh(wallGeo, wallMaterial));
 
-            /* APEX ROOF (Two Planes) - Using your corrected math */
-            const roofHalfWidth = Math.sqrt(Math.pow(D / 2, 2) + Math.pow(peak, 2)) + 0.2;
-            const roofPlateGeo = new THREE.BoxGeometry(W + 0.4, 0.1, roofHalfWidth);
+            const roofHalfWidth = Math.sqrt(Math.pow(D / 2, 2) + Math.pow(peak, 2)) + roofOverhang;
+            const roofPlateGeo = new THREE.BoxGeometry(W + (roofOverhang * 2), 0.1, roofHalfWidth);
             const angle = Math.atan2(peak, D / 2);
 
-            // Left Slope
             const roofL = new THREE.Mesh(roofPlateGeo, roofMaterial);
             roofL.position.set(0, H + (peak / 2) + 0.05, D / 3.75);
             roofL.rotation.x = angle;
             buildingGroup.add(roofL);
 
-            // Right Slope
             const roofR = new THREE.Mesh(roofPlateGeo, roofMaterial);
             roofR.position.set(0, H + (peak / 2) + 0.05, -D / 3.75);
             roofR.rotation.x = -angle;
             buildingGroup.add(roofR);
         }
     } else {
-        /* L-SHAPE (Flat for now) */
+        /*  L-SHAPE SLOPED WALL LOGIC  */
+        const legW = W * 0.5; 
+        const legD = D * 0.5;
+        
         const shape = new THREE.Shape();
-        const legW = W * 0.5; const legD = D * 0.5;
-        shape.moveTo(0, 0); shape.lineTo(legW, 0); shape.lineTo(legW, legD);
-        shape.lineTo(W, legD); shape.lineTo(W, D); shape.lineTo(0, D); shape.lineTo(0, 0);
+        shape.moveTo(0, 0); 
+        shape.lineTo(legW, 0); 
+        shape.lineTo(legW, legD); 
+        shape.lineTo(W, legD); 
+        shape.lineTo(W, D); 
+        shape.lineTo(0, D); 
+        shape.lineTo(0, 0);
 
         const wallGeo = new THREE.ExtrudeGeometry(shape, { steps: 1, depth: H, bevelEnabled: false });
         wallGeo.rotateX(-Math.PI / 2);
+        
+        /* Centering */
         wallGeo.computeBoundingBox();
         const centerX = (wallGeo.boundingBox.max.x + wallGeo.boundingBox.min.x) / 2;
         const centerZ = (wallGeo.boundingBox.max.z + wallGeo.boundingBox.min.z) / 2;
         wallGeo.translate(-centerX, 0, -centerZ);
+
+        /* SLOPE THE L-SHAPE WALLS: 
+           We iterate through the top vertices and add height based on depth (Z) */
+        if (currentRoofType === 'pent') {
+            const pos = wallGeo.attributes.position;
+            for (let i = 0; i < pos.count; i++) {
+                // If vertex is at the top (Y ≈ H)
+                if (pos.getY(i) > H - 0.01) {
+                    const zPos = pos.getZ(i);
+                    /* Calculate how far back the vertex is (from 0 to D)
+                       We reverse it so the Front (most negative Z) is taller */
+                    const normalizedZ = 1 + ((zPos - (D / 2)) /D);
+                    pos.setY(i, H + (normalizedZ * slopeHeight));
+                }
+            }
+            pos.needsUpdate = true;
+        }
+
         buildingGroup.add(new THREE.Mesh(wallGeo, wallMaterial));
 
-        const roofGeo = new THREE.ExtrudeGeometry(shape, { steps: 1, depth: 0.15, bevelEnabled: false });
+        /* ROOF PLATE (with Overhang) */
+        const roofShape = new THREE.Shape();
+        const o = roofOverhang;
+        roofShape.moveTo(-o, -o);
+        roofShape.lineTo(legW + o, -o);
+        roofShape.lineTo(legW + o, legD - o);
+        roofShape.lineTo(W + o, legD - o);
+        roofShape.lineTo(W + o, D + o);
+        roofShape.lineTo(-o, D + o);
+        roofShape.lineTo(-o, -o);
+
+        const roofGeo = new THREE.ExtrudeGeometry(roofShape, { steps: 1, depth: 0.15, bevelEnabled: false });
         roofGeo.rotateX(-Math.PI / 2);
-        roofGeo.translate(-centerX, H, -centerZ);
-        buildingGroup.add(new THREE.Mesh(roofGeo, roofMaterial));
+        
+        const roof = new THREE.Mesh(roofGeo, roofMaterial);
+        
+        if (currentRoofType === 'pent') {
+            /* Position roof slightly above the highest point of the wall */
+            roof.position.set(-centerX, H + (slopeHeight / 2) + 0.1, -centerZ);
+            roof.rotation.x = -Math.atan2(slopeHeight, D); 
+        } else {
+            roof.position.set(-centerX, H, -centerZ);
+        }
+        
+        buildingGroup.add(roof);
     }
 
     building = buildingGroup;
     scene.add(building);
 }
 
-/* UI Functions */
+/* UI & Input Logic */
 window.setRoof = function(type) {
     currentRoofType = type;
     document.querySelectorAll('#roof-options .style-option').forEach(o => o.classList.remove('active'));
@@ -141,7 +187,7 @@ window.setShape = function(type) {
     updateBuilding();
 };
 
-/* Camera & Interface Logic */
+/* Camera & Control logic */
 window.toggleSidebar = function() {
     document.getElementById('sidebar').classList.toggle('open');
     document.getElementById('sidebar-overlay').classList.toggle('active');
