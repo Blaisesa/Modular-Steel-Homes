@@ -1,44 +1,62 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PIR Configurator 3D</title>
     <link rel="stylesheet" href="assets/css/styles.css">
 </head>
-
 <body>
-    <button id="menu-toggle" onclick="toggleSidebar()">
-    <div class="hamburger-icon">
-        <span></span>
-        <span></span>
-        <span></span>
-    </div>
-</button>
-
-<div id="sidebar-overlay" onclick="toggleSidebar()"></div>
     <div class="app-container">
+        <button id="menu-toggle" onclick="toggleSidebar()">
+            <div class="hamburger-icon">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </button>
 
         <aside id="sidebar">
             <div class="sidebar-header">
                 <h2>Configurator</h2>
             </div>
             <nav class="sidebar-nav">
-                <div class="nav-item active">Styles</div>
-                <div class="nav-item">Item 2</div>
-                <div class="nav-item">Item 3</div>
-                <div class="nav-item">Item 4</div>
+                <div class="nav-section active">
+                    <div class="nav-header" onclick="toggleSection(this)">
+                        <span>Styles</span>
+                        <span class="chevron">▼</span>
+                    </div>
+                    <div class="nav-content">
+                        <div class="style-option active" onclick="setShape('rectangle')">
+                            <div class="style-icon">█</div>
+                            <span>Rectangle</span>
+                        </div>
+                        <div class="style-option" onclick="setShape('l-shape')">
+                            <div class="style-icon">┗</div>
+                            <span>L-Shape</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-header" onclick="toggleSection(this)">
+                        <span>Dimensions</span>
+                        <span class="chevron">▼</span>
+                    </div>
+                    <div class="nav-content">
+                        <p style="padding:20px; font-size: 13px; color: #666;">
+                            Adjustments will appear here.
+                        </p>
+                    </div>
+                </div>
             </nav>
         </aside>
 
-        <main id="builder-viewport">
-        </main>
+        <main id="builder-viewport"></main>
 
         <div class="view-controls">
-            <button id="roam-toggle" onclick="toggleFreeRoam()" title="Toggle Free Rotation">🔒</button>
+            <button id="roam-toggle" onclick="toggleFreeRoam()" title="Toggle Lock">🔒</button>
             <div class="control-divider"></div>
-
             <button onclick="rotateTo('iso')">3D</button>
             <div class="control-divider"></div>
             <button onclick="rotateTo('top')">Top</button>
@@ -48,10 +66,10 @@
             <button onclick="rotateTo('right')">Right</button>
         </div>
 
+        <div id="sidebar-overlay" onclick="toggleSidebar()"></div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="assets/js/main.js"></script>
 </body>
-
 </html>

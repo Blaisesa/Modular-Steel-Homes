@@ -2,190 +2,108 @@
     --sidebar-width: 300px;
     --accent-color: #007bff;
     --bg-light: #f4f4f4;
+    --transition-ease: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 body, html {
-    margin: 0;
+    margin: 0; 
     padding: 0;
-    height: 100%;
+    height: 100%; 
     overflow: hidden;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-.app-container {
-    display: flex;
-    width: 100vw;
-    height: 100vh;
-}
+.app-container { display: flex; width: 100vw; height: 100vh; }
 
-/* Sidebar Styling */
+/* Sidebar */
 #sidebar {
     width: var(--sidebar-width);
-    background: #ffffff;
+    background: #fff;
     border-right: 1px solid #ddd;
     display: flex;
     flex-direction: column;
     z-index: 10;
+    transition: left 0.4s var(--transition-ease);
 }
 
-.sidebar-header {
-    padding: 20px;
-    background: #333;
-    color: white;
-}
+.sidebar-header { padding: 20px; background: #333; color: white; }
 
-.sidebar-nav {
-    padding: 10px;
-}
-
-.nav-item {
-    padding: 15px;
-    margin-bottom: 5px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background 0.3s;
-    font-weight: 500;
-}
-
-.nav-item:hover { background: #eee; }
-.nav-item.active { background: var(--accent-color); color: white; }
-
-/* 3D Viewport */
-#builder-viewport {
-    flex-grow: 1;
-    position: relative;
-    background: var(--bg-light);
-}
-
-/* View Controls (Top Right Column) */
-.view-controls {
-    position: absolute;
-    top: 20px;
-    right: 20px;
+/* Expandable Nav */
+.nav-section { border-bottom: 1px solid #eee; }
+.nav-header {
+    padding: 18px 20px;
     display: flex;
-    flex-direction: column;
-    gap: 8px;
-    z-index: 5;
+    justify-content: space-between;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.chevron { font-size: 10px; transition: transform 0.4s var(--transition-ease); }
+.nav-content {
+    max-height: 0;
+    overflow: hidden;
+    background: #fafafa;
+    opacity: 0;
+    transition: max-height 0.4s var(--transition-ease), opacity 0.4s var(--transition-ease);
+}
+
+.nav-section.active .nav-content { max-height: 500px; opacity: 1; }
+.nav-section.active .chevron { transform: rotate(180deg); }
+
+/* Style Buttons */
+.style-option {
+    display: flex; align-items: center; gap: 15px;
+    padding: 15px 25px; cursor: pointer;
+    transform: translateY(10px);
+    transition: all 0.3s var(--transition-ease);
+}
+.nav-section.active .style-option { transform: translateY(0); }
+.style-option.active { color: var(--accent-color); background: #f0f7ff; border-left: 4px solid var(--accent-color); }
+
+/* Viewport */
+#builder-viewport { flex-grow: 1; position: relative; }
+
+/* Hamburger Button */
+#menu-toggle {
+    display: none; width: 40px; height: 40px;
+    background: #333; border: none; border-radius: 8px;
+    position: absolute; top: 20px; right: 20px; z-index: 1100;
+}
+
+.hamburger-icon {
+    width: 20px; height: 14px;
+    display: flex; flex-direction: column; justify-content: space-between;
+}
+
+.hamburger-icon span {
+    width: 100%; height: 2px; background: #fff;
+    border-radius: 10px; transition: 0.3s var(--transition-ease);
+}
+
+/* Hamburger Animation */
+#menu-toggle.open span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+#menu-toggle.open span:nth-child(2) { opacity: 0; transform: translateX(-10px); }
+#menu-toggle.open span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+
+/* View Controls */
+.view-controls {
+    position: absolute; top: 20px; right: 20px;
+    display: flex; flex-direction: column; gap: 8px; z-index: 5;
 }
 
 .view-controls button {
-    width: 60px;
-    height: 45px;
-    background: white;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    font-weight: bold;
-    cursor: pointer;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    transition: all 0.2s;
+    width: 50px; height: 45px; background: white; border: 1px solid #ccc;
+    border-radius: 8px; cursor: pointer; font-weight: bold;
 }
 
-.view-controls button:hover {
-    background: #333;
-    color: white;
-    border-color: #333;
-}
-
-.control-divider {
-    height: 1px;
-    background: #ccc;
-    margin: 5px 0;
-}
-
-#roam-toggle {
-    font-size: 1.2rem;
-    transition: all 0.3s ease;
-}
-
-/* Desktop Defaults */
-#menu-toggle { display: none; } /* Hide menu button on desktop */
-
-/* Mobile Overrides (< 768px) */
+/* Responsive Overrides */
 @media (max-width: 768px) {
-    :root {
-        --sidebar-width: 260px; /* Slightly narrower for mobile */
-    }
-
-    #sidebar {
-        position: fixed;
-        left: -100%; /* Hide it off-screen */
-        top: 0;
-        height: 100%;
-        transition: left 0.3s ease;
-        z-index: 1000;
-    }
-
-    /* When the sidebar has the 'open' class */
-    #sidebar.open {
-        left: 0;
-    }
-
-    /* Hamburger Button */
-   #menu-toggle {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        position: absolute;
-        top: 20px;
-        right: 20px;
-        z-index: 1100;
-        width: 40px; /* Made slightly smaller */
-        height: 40px;
-        background: #333;
-        border: none;
-        border-radius: 8px; /* Softer corner */
-        cursor: pointer;
-    }
-
-    .hamburger-icon {
-        width: 20px; /* Narrower width for elegance */
-        height: 14px; /* Shorter overall height */
-        position: relative;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between; /* Perfect spacing */
-    }
-
-    .hamburger-icon span {
-        display: block;
-        width: 100%;
-        height: 2px; /* Thinner line for a pro look */
-        background-color: white;
-        border-radius: 10px; /* Fully pill-shaped */
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* Smoother "snap" */
-    }
-
-    /* --- Refined X Animation --- */
-    
-    #menu-toggle.open .hamburger-icon span:nth-child(1) {
-        transform: translateY(6px) rotate(45deg);
-    }
-
-    #menu-toggle.open .hamburger-icon span:nth-child(2) {
-        opacity: 0;
-        transform: translateX(-10px); /* Slides out for extra flair */
-    }
-
-    #menu-toggle.open .hamburger-icon span:nth-child(3) {
-        transform: translateY(-6px) rotate(-45deg);
-    }
-
-    /* Dark overlay when menu is open */
-    #sidebar-overlay {
-        display: none;
-        position: fixed;
-        top: 0; left: 0;
-        width: 100%; height: 100%;
-        background: rgba(0,0,0,0.5);
-        z-index: 999;
-    }
-
+    #menu-toggle { display: flex; align-items: center; justify-content: center; }
+    #sidebar { position: fixed; left: -100%; top: 0; height: 100%; }
+    #sidebar.open { left: 0; }
     #sidebar-overlay.active {
-        display: block;
+        display: block; position: fixed; top: 0; left: 0;
+        width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 9;
     }
-
-    /* Move View Controls lower so they don't hit the notch/status bar */
-    .view-controls {
-        top: 80px; 
-    }
+    .view-controls { top: 80px; }
 }
