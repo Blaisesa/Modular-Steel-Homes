@@ -96,6 +96,13 @@ body, html {
     border-radius: 8px; cursor: pointer; font-weight: bold;
 }
 
+/* Style for the currently selected view button */
+.view-controls button.active {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+}
+
 /* Responsive Overrides */
 @media (max-width: 768px) {
     #menu-toggle { display: flex; align-items: center; justify-content: center; }
