@@ -1,14 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PIR Configurator 3D</title>
     <link rel="stylesheet" href="assets/css/styles.css">
 </head>
+
 <body>
     <div class="app-container">
-        
+
         <aside id="sidebar">
             <div class="sidebar-header">
                 <h2>Configurator</h2>
@@ -22,10 +24,13 @@
         </aside>
 
         <main id="builder-viewport">
-            </main>
+        </main>
 
         <div class="view-controls">
-            <button title="3D View" onclick="rotateTo('iso')">3D</button>
+            <button id="roam-toggle" onclick="toggleFreeRoam()" title="Toggle Free Rotation">🔒</button>
+            <div class="control-divider"></div>
+
+            <button onclick="rotateTo('iso')">3D</button>
             <div class="control-divider"></div>
             <button onclick="rotateTo('top')">Top</button>
             <button onclick="rotateTo('front')">Front</button>
@@ -39,4 +44,5 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="assets/js/main.js"></script>
 </body>
+
 </html>

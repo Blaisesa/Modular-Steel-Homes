@@ -5,10 +5,15 @@ let targetAngle = -Math.PI / 4;
 let currentVerticalAngle = 0.25; 
 let targetVerticalAngle = 0.25;
 
-// Camera settings
-const radius = 12; 
+// Camera & Interaction settings
+let radius = 12; 
 const lerpSpeed = 0.08; 
 const W = 6, H = 2.5, D = 4;
+
+let isFreeRoam = false;
+let isDragging = false;
+let previousX = 0;
+let previousY = 0;
 
 // Initialize the Three.js scene, camera, renderer, and building mesh
 function init() {
@@ -43,10 +48,69 @@ function init() {
     building.position.y = H / 2;
     scene.add(building);
 
+    // Unified Input Handling (Desktop + Mobile)
+
+    const startAction = (x, y) => {
+        if (!isFreeRoam) return;
+        isDragging = true;
+        previousX = x;
+        previousY = y;
+    };
+
+    const moveAction = (x, y) => {
+        if (!isDragging || !isFreeRoam) return;
+        const deltaX = x - previousX;
+        const deltaY = y - previousY;
+
+        targetAngle += deltaX * 0.005; 
+        targetVerticalAngle += deltaY * 0.005;
+        targetVerticalAngle = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, targetVerticalAngle));
+
+        previousX = x;
+        previousY = y;
+    };
+
+    const endAction = () => { isDragging = false; };
+
+    // Mouse Listeners
+    container.addEventListener('mousedown', (e) => startAction(e.clientX, e.clientY));
+    window.addEventListener('mousemove', (e) => moveAction(e.clientX, e.clientY));
+    window.addEventListener('mouseup', endAction);
+
+    // Touch Listeners (Mobile)
+    container.addEventListener('touchstart', (e) => {
+        // Prevent scrolling the whole page while rotating the building
+        if (isFreeRoam) e.preventDefault(); 
+        startAction(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: false });
+
+    window.addEventListener('touchmove', (e) => {
+        if (isFreeRoam) e.preventDefault();
+        moveAction(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: false });
+
+    window.addEventListener('touchend', endAction);
+
+    // Zoom (Wheel)
+    container.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const zoomSpeed = 0.5;
+        radius += e.deltaY > 0 ? zoomSpeed : -zoomSpeed;
+        radius = Math.max(5, Math.min(25, radius));
+    }, { passive: false });
+
     animate();
 }
 
-// Function to rotate the camera to a specific view
+window.toggleFreeRoam = function() {
+    isFreeRoam = !isFreeRoam;
+    const btn = document.getElementById('roam-toggle');
+    // Your updated logic: Unlocked when active
+    btn.innerHTML = isFreeRoam ? '🔓' : '🔒'; 
+    btn.style.background = isFreeRoam ? '#007bff' : 'white';
+    btn.style.color = isFreeRoam ? 'white' : 'black';
+}
+
 window.rotateTo = function(view) {
     const views = {
         'front': { h: 0, v: 0 },
