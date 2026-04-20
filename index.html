@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PIR Configurator 3D</title>
     <link rel="stylesheet" href="assets/css/styles.css">
 </head>
+
 <body>
     <div class="app-container">
         <button id="menu-toggle" onclick="toggleSidebar()">
@@ -37,7 +39,20 @@
                         </div>
                     </div>
                 </div>
-
+                <div class="nav-section">
+                    <div class="nav-header" onclick="toggleSection(this)">
+                        <span>Roof Style</span>
+                        <span class="chevron">▼</span>
+                    </div>
+                    <div class="nav-content">
+                        <div class="style-option active" onclick="setRoof('flat')">
+                            <span>Flat / Pent</span>
+                        </div>
+                        <div class="style-option" onclick="setRoof('apex')">
+                            <span>Apex (Coming Soon)</span>
+                        </div>
+                    </div>
+                </div>
                 <div class="nav-section">
                     <div class="nav-header" onclick="toggleSection(this)">
                         <span>Dimensions</span>
@@ -72,4 +87,5 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="assets/js/main.js"></script>
 </body>
+
 </html>
