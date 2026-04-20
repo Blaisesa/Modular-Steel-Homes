@@ -1,8 +1,8 @@
 let scene, camera, renderer, building;
-let currentAngle = Math.PI / 4; 
-let targetAngle = Math.PI / 4; 
-let currentVerticalAngle = 0.5; 
-let targetVerticalAngle = 0.5;
+let currentAngle = -Math.PI / 4; 
+let targetAngle = -Math.PI / 4; 
+let currentVerticalAngle = 0.25; 
+let targetVerticalAngle = 0.25;
 
 const radius = 12; 
 const lerpSpeed = 0.08; 
@@ -46,7 +46,7 @@ window.rotateTo = function(view) {
         'back':  { h: Math.PI, v: 0 },
         'left':  { h: -Math.PI / 2, v: 0 },
         'top':   { h: 0, v: Math.PI / 2.1 },
-        'iso':   { h: Math.PI / 4, v: 0.5 }
+        'iso':   { h: -Math.PI / 4, v: 0.25 }
     };
     if (views[view]) {
         targetAngle = views[view].h;
