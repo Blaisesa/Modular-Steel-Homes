@@ -182,6 +182,11 @@ function addMeshWithEdges(geo, mat, edgeMat, group) {
     group.add(line);
 }
 
+/* UI Logic */
+window.handleZoomSlider = function(val) {
+    radius = parseFloat(val);
+};
+
 window.updateDim = function(prop, val) {
     if (prop === 'W') W = parseFloat(val);
     if (prop === 'D') D = parseFloat(val);
@@ -236,11 +241,7 @@ window.rotateTo = function(view) {
 
 function setupInputs(container) {
     const start = (x, y) => { 
-        if (isFreeRoam) { 
-            isDragging = true; 
-            previousX = x; 
-            previousY = y; 
-        } 
+        if (isFreeRoam) { isDragging = true; previousX = x; previousY = y; } 
     };
 
     const move = (x, y) => {
@@ -248,23 +249,20 @@ function setupInputs(container) {
         targetAngle += (x - previousX) * 0.005;
         targetVerticalAngle += (y - previousY) * 0.005;
         targetVerticalAngle = Math.max(-1.4, Math.min(1.4, targetVerticalAngle));
-        previousX = x; 
-        previousY = y;
+        previousX = x; previousY = y;
     };
 
-    // Desktop
     container.addEventListener('mousedown', (e) => start(e.clientX, e.clientY));
     window.addEventListener('mousemove', (e) => move(e.clientX, e.clientY));
     window.addEventListener('mouseup', () => isDragging = false);
 
-    // Mobile Support
     container.addEventListener('touchstart', (e) => {
         const touch = e.touches[0];
         start(touch.clientX, touch.clientY);
     }, { passive: false });
 
     window.addEventListener('touchmove', (e) => {
-        if (isDragging && isFreeRoam) e.preventDefault(); // Stop scrolling while rotating
+        if (isDragging && isFreeRoam) e.preventDefault();
         const touch = e.touches[0];
         move(touch.clientX, touch.clientY);
     }, { passive: false });
@@ -279,6 +277,11 @@ function setupInputs(container) {
 
 function animate() {
     requestAnimationFrame(animate);
+
+    // Sync slider with current radius
+    const slider = document.getElementById('zoom-slider');
+    if (slider) slider.value = radius;
+
     currentAngle += (targetAngle - currentAngle) * lerpSpeed;
     currentVerticalAngle += (targetVerticalAngle - currentVerticalAngle) * lerpSpeed;
     camera.position.x = radius * Math.cos(currentVerticalAngle) * Math.sin(currentAngle);
