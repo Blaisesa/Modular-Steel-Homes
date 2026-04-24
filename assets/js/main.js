@@ -6,12 +6,13 @@ let previousX = 0, previousY = 0;
 
 /* Global Dimensions & States */
 const lerpSpeed = 0.08;
-let W = 6, H = 2.5, D = 4;
+let W = 6, H = 2.8, D = 4;
 let currentShapeType = 'rectangle';
 let currentRoofType = 'pent'; 
+let showRoof = true; // NEW: Toggle state
 const roofOverhang = 0.2; 
-const slopeHeight = 0.3; 
-const peakHeight = 0.6;
+const slopeHeight = 0.45; 
+const peakHeight = 0.8;
 
 function init() {
     const container = document.getElementById('builder-viewport');
@@ -32,7 +33,7 @@ function init() {
     scene.add(grid);
 
     updateBuilding();
-    fitCamera(); // Initial fit
+    fitCamera(); 
     setupInputs(container);
     animate();
 }
@@ -67,13 +68,14 @@ function updateBuilding() {
             wallGeo.translate(-W / 2, 0, D / 2);
             addMeshWithEdges(wallGeo, wallMaterial, edgeMaterial, buildingGroup);
 
-            const roofGeo = new THREE.BoxGeometry(W + (roofOverhang * 2), 0.15, D + (roofOverhang * 2));
-            const roof = new THREE.Mesh(roofGeo, roofMaterial);
-            const angle = -Math.atan2(slopeHeight, D);
-            
-            roof.rotation.x = angle;
-            roof.position.y = H + (slopeHeight / 2) + 0.08; 
-            buildingGroup.add(roof);
+            if (showRoof) {
+                const roofGeo = new THREE.BoxGeometry(W + (roofOverhang * 2), 0.15, D + (roofOverhang * 2));
+                const roof = new THREE.Mesh(roofGeo, roofMaterial);
+                const angle = -Math.atan2(slopeHeight, D);
+                roof.rotation.x = angle;
+                roof.position.y = H + (slopeHeight / 2) + 0.08; 
+                buildingGroup.add(roof);
+            }
 
         } else if (currentRoofType === 'apex') {
             const wallShape = new THREE.Shape();
@@ -89,22 +91,23 @@ function updateBuilding() {
             wallGeo.translate(-W / 2, 0, D / 2);
             addMeshWithEdges(wallGeo, wallMaterial, edgeMaterial, buildingGroup);
 
-            const roofThickness = 0.1;
-            const angle = Math.atan2(peakHeight, D / 2);
-            const roofHalfWidth = (D / 2) / Math.cos(angle) + roofOverhang;
-            const roofPlateGeo = new THREE.BoxGeometry(W + (roofOverhang * 2), roofThickness, roofHalfWidth);
+            if (showRoof) {
+                const roofThickness = 0.1;
+                const angle = Math.atan2(peakHeight, D / 2);
+                const roofHalfWidth = (D / 2) / Math.cos(angle) + roofOverhang;
+                const roofPlateGeo = new THREE.BoxGeometry(W + (roofOverhang * 2), roofThickness, roofHalfWidth);
+                const xOffset = (D / 3.90) + (roofOverhang / 4);
 
-            const xOffset = (D / 3.90) + (roofOverhang / 4);
+                const roofL = new THREE.Mesh(roofPlateGeo, roofMaterial);
+                roofL.position.set(0, H + (peakHeight / 2) + (roofThickness / 2), xOffset);
+                roofL.rotation.x = angle;
+                buildingGroup.add(roofL);
 
-            const roofL = new THREE.Mesh(roofPlateGeo, roofMaterial);
-            roofL.position.set(0, H + (peakHeight / 2) + (roofThickness / 2), xOffset);
-            roofL.rotation.x = angle;
-            buildingGroup.add(roofL);
-
-            const roofR = new THREE.Mesh(roofPlateGeo, roofMaterial);
-            roofR.position.set(0, H + (peakHeight / 2) + (roofThickness / 2), -xOffset);
-            roofR.rotation.x = -angle;
-            buildingGroup.add(roofR);
+                const roofR = new THREE.Mesh(roofPlateGeo, roofMaterial);
+                roofR.position.set(0, H + (peakHeight / 2) + (roofThickness / 2), -xOffset);
+                roofR.rotation.x = -angle;
+                buildingGroup.add(roofR);
+            }
         }
     } else {
         /* L-SHAPE LOGIC */
@@ -142,33 +145,34 @@ function updateBuilding() {
 
         addMeshWithEdges(wallGeo, wallMaterial, edgeMaterial, buildingGroup);
 
-        const roofShape = new THREE.Shape();
-        const o = roofOverhang;
-        roofShape.moveTo(-o, -o);
-        roofShape.lineTo(legW + o, -o);
-        roofShape.lineTo(legW + o, legD - o);
-        roofShape.lineTo(W + o, legD - o);
-        roofShape.lineTo(W + o, D + o);
-        roofShape.lineTo(-o, D + o);
-        roofShape.lineTo(-o, -o);
+        if (showRoof) {
+            const roofShape = new THREE.Shape();
+            const o = roofOverhang;
+            roofShape.moveTo(-o, -o);
+            roofShape.lineTo(legW + o, -o);
+            roofShape.lineTo(legW + o, legD - o);
+            roofShape.lineTo(W + o, legD - o);
+            roofShape.lineTo(W + o, D + o);
+            roofShape.lineTo(-o, D + o);
+            roofShape.lineTo(-o, -o);
 
-        const roofGeo = new THREE.ExtrudeGeometry(roofShape, { steps: 1, depth: 0.1, bevelEnabled: false });
-        roofGeo.rotateX(-Math.PI / 2);
-        
-        const roof = new THREE.Mesh(roofGeo, roofMaterial);
-        
-        if (currentRoofType === 'pent') {
-            const angle = -Math.atan2(slopeHeight, D);
-            roof.position.set(-centerX, H - 0.15, -centerZ);
-            roof.geometry.translate(0, 0, -D/2); 
-            roof.rotation.x = angle;
-            roof.geometry.translate(0, 0, D/2);
-            roof.position.y += (slopeHeight / 2);
-        } else {
-            roof.position.set(-centerX, H + 0.05, -centerZ);
+            const roofGeo = new THREE.ExtrudeGeometry(roofShape, { steps: 1, depth: 0.1, bevelEnabled: false });
+            roofGeo.rotateX(-Math.PI / 2);
+            
+            const roof = new THREE.Mesh(roofGeo, roofMaterial);
+            
+            if (currentRoofType === 'pent') {
+                const angle = -Math.atan2(slopeHeight, D);
+                roof.position.set(-centerX, H - 0.21, -centerZ);
+                roof.geometry.translate(0, 0, -D/2); 
+                roof.rotation.x = angle;
+                roof.geometry.translate(0, 0, D/2);
+                roof.position.y += (slopeHeight / 2);
+            } else {
+                roof.position.set(-centerX, H + 0.05, -centerZ);
+            }
+            buildingGroup.add(roof);
         }
-        
-        buildingGroup.add(roof);
     }
 
     building = buildingGroup;
@@ -183,20 +187,24 @@ function addMeshWithEdges(geo, mat, edgeMat, group) {
     group.add(line);
 }
 
-/* Auto-Zoom Logic */
 function fitCamera() {
-    // Calculate the diagonal of the building base
     const diagonal = Math.sqrt(W * W + D * D);
-    // Adjust targetRadius based on diagonal and height, with a buffer
     targetRadius = Math.max(diagonal * 1.5, H * 3);
-    // Keep it within our slider limits
     targetRadius = Math.max(5, Math.min(25, targetRadius));
 }
 
 /* UI Logic */
+window.toggleRoof = function() {
+    showRoof = !showRoof;
+    const btn = document.getElementById('roof-toggle');
+    btn.classList.toggle('active');
+    btn.innerHTML = showRoof ? '🏠' : '🏚️'; 
+    updateBuilding();
+};
+
 window.handleZoomSlider = function(val) {
     targetRadius = parseFloat(val);
-    radius = targetRadius; // Jump immediately on slider drag
+    radius = targetRadius;
 };
 
 window.updateDim = function(prop, val) {
@@ -205,7 +213,7 @@ window.updateDim = function(prop, val) {
     const label = document.getElementById(`val-${prop.toLowerCase()}`);
     if (label) label.innerText = val;
     updateBuilding();
-    fitCamera(); // Auto-zoom whenever dimensions change
+    fitCamera(); 
 };
 
 window.setRoof = function(type) {
@@ -248,16 +256,13 @@ window.toggleFreeRoam = function() {
 window.rotateTo = function(view) {
     document.querySelectorAll('.view-controls button').forEach(btn => btn.classList.remove('active'));
     const clickedBtn = event.currentTarget;
-    if (clickedBtn && clickedBtn.id !== 'roam-toggle') clickedBtn.classList.add('active');
+    if (clickedBtn && clickedBtn.id !== 'roam-toggle' && clickedBtn.id !== 'roof-toggle') clickedBtn.classList.add('active');
     const views = { 'front': [0, 0], 'right': [Math.PI/2, 0], 'back': [Math.PI, 0], 'left': [-Math.PI/2, 0], 'top': [0, 1.5], 'iso': [-Math.PI/4, 0.25] };
     if (views[view]) [targetAngle, targetVerticalAngle] = views[view];
 };
 
 function setupInputs(container) {
-    const start = (x, y) => { 
-        if (isFreeRoam) { isDragging = true; previousX = x; previousY = y; } 
-    };
-
+    const start = (x, y) => { if (isFreeRoam) { isDragging = true; previousX = x; previousY = y; } };
     const move = (x, y) => {
         if (!isDragging || !isFreeRoam) return;
         targetAngle += (x - previousX) * 0.005;
@@ -265,24 +270,9 @@ function setupInputs(container) {
         targetVerticalAngle = Math.max(-1.4, Math.min(1.4, targetVerticalAngle));
         previousX = x; previousY = y;
     };
-
     container.addEventListener('mousedown', (e) => start(e.clientX, e.clientY));
     window.addEventListener('mousemove', (e) => move(e.clientX, e.clientY));
     window.addEventListener('mouseup', () => isDragging = false);
-
-    container.addEventListener('touchstart', (e) => {
-        const touch = e.touches[0];
-        start(touch.clientX, touch.clientY);
-    }, { passive: false });
-
-    window.addEventListener('touchmove', (e) => {
-        if (isDragging && isFreeRoam) e.preventDefault();
-        const touch = e.touches[0];
-        move(touch.clientX, touch.clientY);
-    }, { passive: false });
-
-    window.addEventListener('touchend', () => isDragging = false);
-
     container.addEventListener('wheel', (e) => { 
         e.preventDefault(); 
         targetRadius = Math.max(5, Math.min(25, targetRadius + (e.deltaY > 0 ? 0.5 : -0.5))); 
@@ -291,14 +281,9 @@ function setupInputs(container) {
 
 function animate() {
     requestAnimationFrame(animate);
-
-    // Smoothly interpolate radius
     radius += (targetRadius - radius) * lerpSpeed;
-
-    // Sync slider with current radius
     const slider = document.getElementById('zoom-slider');
     if (slider) slider.value = radius;
-
     currentAngle += (targetAngle - currentAngle) * lerpSpeed;
     currentVerticalAngle += (targetVerticalAngle - currentVerticalAngle) * lerpSpeed;
     camera.position.x = radius * Math.cos(currentVerticalAngle) * Math.sin(currentAngle);

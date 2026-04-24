@@ -200,3 +200,23 @@ body, html {
     border: 2px solid white;
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
+
+/* Roof Toggle Specific Styling */
+#roof-toggle {
+    background: white;
+    font-size: 18px;
+    transition: all 0.3s var(--transition-ease);
+}
+
+#roof-toggle.active {
+    background: #dc3545; /* Red to indicate roof is 'off' or hidden */
+    color: white;
+    border-color: #dc3545;
+}
+
+/* Ensure icons are centered in view controls */
+.view-controls button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
