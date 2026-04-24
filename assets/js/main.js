@@ -1,7 +1,7 @@
 let scene, camera, renderer, building;
 let currentAngle = -Math.PI / 4, targetAngle = -Math.PI / 4;
 let currentVerticalAngle = 0.25, targetVerticalAngle = 0.25;
-let radius = 12, isFreeRoam = false, isDragging = false;
+let radius = 12, targetRadius = 12, isFreeRoam = false, isDragging = false;
 let previousX = 0, previousY = 0;
 
 /* Global Dimensions & States */
@@ -32,6 +32,7 @@ function init() {
     scene.add(grid);
 
     updateBuilding();
+    fitCamera(); // Initial fit
     setupInputs(container);
     animate();
 }
@@ -182,9 +183,20 @@ function addMeshWithEdges(geo, mat, edgeMat, group) {
     group.add(line);
 }
 
+/* Auto-Zoom Logic */
+function fitCamera() {
+    // Calculate the diagonal of the building base
+    const diagonal = Math.sqrt(W * W + D * D);
+    // Adjust targetRadius based on diagonal and height, with a buffer
+    targetRadius = Math.max(diagonal * 1.5, H * 3);
+    // Keep it within our slider limits
+    targetRadius = Math.max(5, Math.min(25, targetRadius));
+}
+
 /* UI Logic */
 window.handleZoomSlider = function(val) {
-    radius = parseFloat(val);
+    targetRadius = parseFloat(val);
+    radius = targetRadius; // Jump immediately on slider drag
 };
 
 window.updateDim = function(prop, val) {
@@ -193,6 +205,7 @@ window.updateDim = function(prop, val) {
     const label = document.getElementById(`val-${prop.toLowerCase()}`);
     if (label) label.innerText = val;
     updateBuilding();
+    fitCamera(); // Auto-zoom whenever dimensions change
 };
 
 window.setRoof = function(type) {
@@ -207,6 +220,7 @@ window.setShape = function(type) {
     document.querySelectorAll('.sidebar-nav .nav-section:first-child .style-option').forEach(o => o.classList.remove('active'));
     event.currentTarget.classList.add('active');
     updateBuilding();
+    fitCamera(); 
 };
 
 window.toggleSidebar = function() {
@@ -271,12 +285,15 @@ function setupInputs(container) {
 
     container.addEventListener('wheel', (e) => { 
         e.preventDefault(); 
-        radius = Math.max(5, Math.min(25, radius + (e.deltaY > 0 ? 0.5 : -0.5))); 
+        targetRadius = Math.max(5, Math.min(25, targetRadius + (e.deltaY > 0 ? 0.5 : -0.5))); 
     }, { passive: false });
 }
 
 function animate() {
     requestAnimationFrame(animate);
+
+    // Smoothly interpolate radius
+    radius += (targetRadius - radius) * lerpSpeed;
 
     // Sync slider with current radius
     const slider = document.getElementById('zoom-slider');
