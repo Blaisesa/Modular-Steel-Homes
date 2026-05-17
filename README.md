@@ -2,20 +2,24 @@
 
 A lightweight, interactive 3D web tool built with Three.js designed for modular building customization (sheds, cabins, and garages). The application provides real-time adjustments for building dimensions, floor shapes, and roof structures with clean architectural line tracking.
 
+🔗 **Live Demo:** [https://blaisesa.github.io/Modular-Steel-Homes/](https://blaisesa.github.io/Modular-Steel-Homes/)
+
 ---
 
 ## Current State
 
-The project features a responsive 3D viewport with fully integrated global state controls and a modular mesh compilation pipeline. Recent architectural overhauls resolved major geometric rendering bugs and triangulation artifacts.
+The project features a responsive 3D viewport with fully integrated global state controls and a modular mesh compilation pipeline. Recent architectural overhauls resolved geometric rendering bugs, unified roof generation pipelines, and introduced context-aware UI constraints.
 
 ### 1. Geometry & Wall Systems
 * **4-Panel Solid Wall System (Rectangle):** Re-engineered from a single hollow extrusion to a 4-panel solid modular layout (Left, Right, Front, Back panels). Left and Right panels are compiled natively as 5-sided shapes (polygons) matching the explicit roof slope profile. This completely eliminates twisted faces across the inner/outer wall thickness and removes horizontal seam lines.
-* **L-Shape Structural Layout:** Supports compound footprint shapes with synchronized counter-clockwise outer boundaries and clockwise inner paths to guarantee perfect polygon triangulation hole-cutting.
+* **6-Panel Solid Wall System (L-Shape):** Supports compound footprint shapes with synchronized outer boundaries and precise wall snapping. Side panel heights are calculated dynamically via linear interpolation based on their precise Z-axis positions to ensure perfect alignment with the roof gradient.
 * **Permanent Floor System:** Custom shape-matching baseline grids offset slightly on the Y-axis (`0.01`) to prevent Z-fighting against the ambient environment grid.
 
-### 2. Roof Engineering
-* **Apex Roof:** Dynamically places structurally accurate dual sloped roof plates calculated cleanly using trigonometric angles, built-in ridge alignments, and customized edge overhang variables (`roofOverhang`).
-* **Pent Roof:** Single sloped roof structures tracking calculated slope rises (`slopeHeight`) from back-to-front.
+### 2. Roof Engineering & Consolidation
+* **Consolidated Roof Generation Engine (`createRoof`):** Unified roof creation logic into a single, highly flexible function that handles extrusion, rotation, translation, and specific alignment matrices for all supported configurations.
+* **L-Shape Scope Reduction:** Programmatically disables the "Apex" roof selection option when the L-shape configuration is active. The application handles this by dynamically updating UI visibility via `updateRoofOptionsVisibility()`, forcing a graceful fallback to a single directional sloped (pent) structure if an incompatible layout is chosen.
+* **Apex Roof (Rectangle Only):** Dynamically places structurally accurate dual sloped roof plates calculated cleanly using trigonometric angles, built-in ridge alignments, and customized edge overhang variables (`roofOverhang`).
+* **Pent Roof:** Single sloped roof structures tracking calculated slope rises (`slopeHeight`) from back-to-front. Includes automatic roof translation adjustments to snap perfectly to structural boundaries.
 * **Toggle System:** Clean visual toggles between exposed frameworks (roofless) and fully clad models.
 
 ### 3. Viewport & Camera Kinematics
@@ -30,7 +34,6 @@ The project features a responsive 3D viewport with fully integrated global state
 The development trajectory is focused on moving from a solid wireframe shell to a hyper-customizable component builder. The upcoming features are categorized by functional engineering goals:
 
 ### 1. Architectural Adjustments & Visibility Mechanics
-* **L-Shape Scope Reduction:** Remove the apex roof option entirely from the L-shape configuration, scaling its logic back to strictly support a single directional sloped (pent) roof structure.
 * **Smart Viewpoint Occlusion (Partial Wall Hiding):** Implement an automated panel visibility handler driven by the camera's orientation. For example, if the user snaps to or orbits around the front view, the front wall panel dynamically hides so the interior can be edited without geometry clipping.
 
 ### 2. Component Framework (Doors, Windows, Utilities)
