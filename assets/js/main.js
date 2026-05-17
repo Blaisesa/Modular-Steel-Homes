@@ -22,6 +22,8 @@ const roofOverhang = 0.2;
 const slopeHeight = 0.45;
 const peakHeight = 0.8;
 const wallThickness = 0.15; // 150mm
+const roofThickness = 0.15; // Consolidated roof thickness
+const roofGap = 0.02; // Gap between wall and roof
 
 function init() {
     const container = document.getElementById("builder-viewport");
@@ -107,6 +109,78 @@ function createPanelGeo(width, hLeft, hRight) {
         depth: wallThickness,
         bevelEnabled: false,
     });
+}
+
+// Consolidated roof creation function
+function createRoof(roofType, shape, buildingGroup, roofMaterial, isLShape = false, centerX = 0, centerZ = 0) {
+    if (roofType === "pent") {
+        const roofGeo = new THREE.ExtrudeGeometry(shape, {
+            steps: 1,
+            depth: roofThickness,
+            bevelEnabled: false,
+        });
+        roofGeo.rotateX(-Math.PI / 2);
+
+        const roof = new THREE.Mesh(roofGeo, roofMaterial);
+        const angle = -Math.atan2(slopeHeight, D);
+        
+        if (isLShape) {
+            roof.position.set(-centerX, H - 0.01, -centerZ);
+            roof.geometry.translate(0, 0, -D / 2);
+            roof.rotation.x = angle;
+            roof.geometry.translate(0, 0, D / 2);
+            roof.position.y += slopeHeight / 2 + roofGap;
+        } else {
+            roof.rotation.x = angle;
+            roof.position.y = H + slopeHeight / 2 + roofGap;
+        }
+        
+        buildingGroup.add(roof);
+    } else if (roofType === "apex" && !isLShape) {
+        // Apex only for rectangle
+        const angle = Math.atan2(peakHeight, D / 2);
+        const roofHalfWidth = D / 2 / Math.cos(angle) + roofOverhang;
+        const roofPlateGeo = new THREE.BoxGeometry(
+            W + roofOverhang * 2,
+            roofThickness,
+            roofHalfWidth,
+        );
+        const zOffset = D / 4 + roofOverhang / 2;
+
+        const roofL = new THREE.Mesh(roofPlateGeo, roofMaterial);
+        roofL.position.set(
+            0,
+            H + peakHeight / 2 + roofThickness / 2 + roofGap,
+            zOffset,
+        );
+        roofL.rotation.x = angle;
+        buildingGroup.add(roofL);
+
+        const roofR = new THREE.Mesh(roofPlateGeo, roofMaterial);
+        roofR.position.set(
+            0,
+            H + peakHeight / 2 + roofThickness / 2 + roofGap,
+            -zOffset,
+        );
+        roofR.rotation.x = -angle;
+        buildingGroup.add(roofR);
+    } else {
+        // Flat roof
+        const roofGeo = new THREE.ExtrudeGeometry(shape, {
+            steps: 1,
+            depth: roofThickness,
+            bevelEnabled: false,
+        });
+        roofGeo.rotateX(-Math.PI / 2);
+
+        const roof = new THREE.Mesh(roofGeo, roofMaterial);
+        if (isLShape) {
+            roof.position.set(-centerX, H + roofGap, -centerZ);
+        } else {
+            roof.position.y = H + roofGap;
+        }
+        buildingGroup.add(roof);
+    }
 }
 
 function updateBuilding() {
@@ -206,52 +280,20 @@ function updateBuilding() {
 
         // --- ROOF (Toggled) ---
         if (showRoof) {
-            if (currentRoofType === "pent") {
-                const roofGeo = new THREE.BoxGeometry(
-                    W + roofOverhang * 2,
-                    0.15,
-                    D + roofOverhang * 2,
-                );
-                const roof = new THREE.Mesh(roofGeo, roofMaterial);
-                const angle = -Math.atan2(slopeHeight, D);
-                roof.rotation.x = angle;
-                roof.position.y = H + slopeHeight / 2;
-                buildingGroup.add(roof);
-            } else {
-                const roofThickness = 0.15;
-                const angle = Math.atan2(peakHeight, D / 2);
-                const roofHalfWidth = D / 2 / Math.cos(angle) + roofOverhang;
-                const roofPlateGeo = new THREE.BoxGeometry(
-                    W + roofOverhang * 2,
-                    roofThickness,
-                    roofHalfWidth,
-                );
-                const zOffset = D / 4 + roofOverhang / 2;
+            const roofShape = new THREE.Shape();
+            const o = roofOverhang;
+            roofShape.moveTo(-W / 2 - o, -D / 2 - o);
+            roofShape.lineTo(W / 2 + o, -D / 2 - o);
+            roofShape.lineTo(W / 2 + o, D / 2 + o);
+            roofShape.lineTo(-W / 2 - o, D / 2 + o);
+            roofShape.closePath();
 
-                const roofL = new THREE.Mesh(roofPlateGeo, roofMaterial);
-                roofL.position.set(
-                    0,
-                    H + peakHeight / 2 + roofThickness / 2,
-                    zOffset,
-                );
-                roofL.rotation.x = angle;
-                buildingGroup.add(roofL);
-
-                const roofR = new THREE.Mesh(roofPlateGeo, roofMaterial);
-                roofR.position.set(
-                    0,
-                    H + peakHeight / 2 + roofThickness / 2,
-                    -zOffset,
-                );
-                roofR.rotation.x = -angle;
-                buildingGroup.add(roofR);
-            }
+            createRoof(currentRoofType, roofShape, buildingGroup, roofMaterial, false);
         }
     } else {
         // --- 6-PANEL SOLID WALL SYSTEM (L-SHAPE) ---
-        // L-Shape disables the "Apex" roof entirely and scales back to Sloped (Pent)
-        const effectiveRoofType =
-            currentRoofType === "apex" ? "pent" : currentRoofType;
+        // L-Shape disables the "Apex" roof entirely
+        const effectiveRoofType = currentRoofType === "apex" ? "pent" : currentRoofType;
 
         const getZHeight = (z) => {
             if (effectiveRoofType !== "pent") return H;
@@ -304,11 +346,11 @@ function updateBuilding() {
 
         // 4. Inner Back Wall (At notch, runs along z=0+t from x=0+t to x=W/2-t)
         const innerBackWallGeo = createPanelGeo(
-            W / 2 - t,
+            W / 2,
             getZHeight(0),
             getZHeight(0),
         );
-        innerBackWallGeo.translate(W / 4 - t / 2, 0, 0);
+        innerBackWallGeo.translate(W / 4, 0, 0);
         addMeshWithEdges(
             innerBackWallGeo,
             wallMaterial,
@@ -373,22 +415,11 @@ function updateBuilding() {
             roofShape.lineTo(-W / 2 - o, -D / 2 - o);
             roofShape.closePath();
 
-            const roofGeo = new THREE.ExtrudeGeometry(roofShape, {
-                steps: 1,
-                depth: 0.15,
-                bevelEnabled: false,
-            });
-            roofGeo.rotateX(-Math.PI / 2);
+            const roofGeo = new THREE.ShapeGeometry(roofShape);
+            const centerX = 0;
+            const centerZ = 0;
 
-            const roof = new THREE.Mesh(roofGeo, roofMaterial);
-            if (effectiveRoofType === "pent") {
-                const angle = -Math.atan2(slopeHeight, D);
-                roof.rotation.x = angle;
-                roof.position.y = H + slopeHeight / 2 - 0.05;
-            } else {
-                roof.position.y = H + 0.05;
-            }
-            buildingGroup.add(roof);
+            createRoof(effectiveRoofType, roofShape, buildingGroup, roofMaterial, true, centerX, centerZ);
         }
     }
 
@@ -450,8 +481,31 @@ window.setShape = function (type) {
         .querySelectorAll(".sidebar-nav .nav-section:first-child .style-option")
         .forEach((o) => o.classList.remove("active"));
     if (event) event.currentTarget.classList.add("active");
+    
+    // Update roof options visibility based on shape
+    updateRoofOptionsVisibility();
+    
     updateBuilding();
     fitCamera();
+};
+
+// New function to show/hide apex option based on shape
+window.updateRoofOptionsVisibility = function () {
+    const apexOption = document.querySelector('#roof-options .style-option[onclick*="apex"]');
+    if (apexOption) {
+        if (currentShapeType === "l-shape") {
+            apexOption.style.display = "none";
+            // If apex is currently selected, switch to pent
+            if (currentRoofType === "apex") {
+                currentRoofType = "pent";
+                document.querySelectorAll("#roof-options .style-option").forEach((o) => o.classList.remove("active"));
+                const pentOption = document.querySelector('#roof-options .style-option[onclick*="pent"]');
+                if (pentOption) pentOption.classList.add("active");
+            }
+        } else {
+            apexOption.style.display = "";
+        }
+    }
 };
 
 window.toggleSidebar = function () {
