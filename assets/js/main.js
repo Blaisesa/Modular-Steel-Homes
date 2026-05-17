@@ -209,16 +209,16 @@ function updateBuilding() {
             if (currentRoofType === "pent") {
                 const roofGeo = new THREE.BoxGeometry(
                     W + roofOverhang * 2,
-                    0.1,
+                    0.15,
                     D + roofOverhang * 2,
                 );
                 const roof = new THREE.Mesh(roofGeo, roofMaterial);
                 const angle = -Math.atan2(slopeHeight, D);
                 roof.rotation.x = angle;
-                roof.position.y = H + slopeHeight / 2 + 0.05;
+                roof.position.y = H + slopeHeight / 2;
                 buildingGroup.add(roof);
             } else {
-                const roofThickness = 0.1;
+                const roofThickness = 0.15;
                 const angle = Math.atan2(peakHeight, D / 2);
                 const roofHalfWidth = D / 2 / Math.cos(angle) + roofOverhang;
                 const roofPlateGeo = new THREE.BoxGeometry(
@@ -375,7 +375,7 @@ function updateBuilding() {
 
             const roofGeo = new THREE.ExtrudeGeometry(roofShape, {
                 steps: 1,
-                depth: 0.1,
+                depth: 0.15,
                 bevelEnabled: false,
             });
             roofGeo.rotateX(-Math.PI / 2);
@@ -384,7 +384,7 @@ function updateBuilding() {
             if (effectiveRoofType === "pent") {
                 const angle = -Math.atan2(slopeHeight, D);
                 roof.rotation.x = angle;
-                roof.position.y = H + slopeHeight / 2 + 0.05;
+                roof.position.y = H + slopeHeight / 2 - 0.05;
             } else {
                 roof.position.y = H + 0.05;
             }
