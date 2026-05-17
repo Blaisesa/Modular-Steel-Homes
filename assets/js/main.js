@@ -52,48 +52,25 @@ function init() {
     animate();
 }
 
-function createSubdividedPath(points, isHole = false, subdivideEdges = null) {
-    const shape = isHole ? new THREE.Path() : new THREE.Shape();
-    shape.moveTo(points[0].x, points[0].y);
-    
-    for (let i = 0; i < points.length; i++) {
-        const p1 = points[i];
-        const p2 = points[(i + 1) % points.length];
-        const dist = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
-        
-        const shouldSubdivide = subdivideEdges === null || subdivideEdges.includes(i);
-        const segments = shouldSubdivide ? Math.max(1, Math.floor(dist * 5)) : 1;
-
-        for (let s = 1; s <= segments; s++) {
-            const t = s / segments;
-            shape.lineTo(p1.x + (p2.x - p1.x) * t, p1.y + (p2.y - p1.y) * t);
-        }
-    }
-    
-    if (!isHole) shape.closePath(); 
-    
-    return shape;
-}
-
-/* Wall Geometry Helpers to eliminate Seam Lines */
+/* Wall Geometry Helpers */
 function createSideWallGeometry(widthAlongZ, baseH, roofType) {
     const shape = new THREE.Shape();
     shape.moveTo(-widthAlongZ / 2, 0);
     shape.lineTo(widthAlongZ / 2, 0);
-    
+
     if (roofType === "apex") {
         shape.lineTo(widthAlongZ / 2, baseH);
         shape.lineTo(0, baseH + peakHeight);
         shape.lineTo(-widthAlongZ / 2, baseH);
     } else if (roofType === "pent") {
-        shape.lineTo(widthAlongZ / 2, baseH + slopeHeight); // High front side
-        shape.lineTo(-widthAlongZ / 2, baseH);              // Low back side
+        shape.lineTo(widthAlongZ / 2, baseH + slopeHeight);
+        shape.lineTo(-widthAlongZ / 2, baseH);
     } else {
         shape.lineTo(widthAlongZ / 2, baseH);
         shape.lineTo(-widthAlongZ / 2, baseH);
     }
     shape.closePath();
-    
+
     return new THREE.ExtrudeGeometry(shape, {
         steps: 1,
         depth: wallThickness,
@@ -108,7 +85,23 @@ function createRectWallGeometry(widthAlongX, heightY) {
     shape.lineTo(widthAlongX / 2, heightY);
     shape.lineTo(-widthAlongX / 2, heightY);
     shape.closePath();
-    
+
+    return new THREE.ExtrudeGeometry(shape, {
+        steps: 1,
+        depth: wallThickness,
+        bevelEnabled: false,
+    });
+}
+
+// Universal dynamic sloped panel builder
+function createPanelGeo(width, hLeft, hRight) {
+    const shape = new THREE.Shape();
+    shape.moveTo(-width / 2, 0);
+    shape.lineTo(width / 2, 0);
+    shape.lineTo(width / 2, hRight);
+    shape.lineTo(-width / 2, hLeft);
+    shape.closePath();
+
     return new THREE.ExtrudeGeometry(shape, {
         steps: 1,
         depth: wallThickness,
@@ -169,20 +162,40 @@ function updateBuilding() {
         // Align and position Left Wall panel
         leftWallGeo.rotateY(-Math.PI / 2);
         leftWallGeo.translate(-W / 2 + t, 0, 0);
-        addMeshWithEdges(leftWallGeo, wallMaterial, edgeMaterial, buildingGroup);
+        addMeshWithEdges(
+            leftWallGeo,
+            wallMaterial,
+            edgeMaterial,
+            buildingGroup,
+        );
 
         // Align and position Right Wall panel
         rightWallGeo.rotateY(-Math.PI / 2);
         rightWallGeo.translate(W / 2, 0, 0);
-        addMeshWithEdges(rightWallGeo, wallMaterial, edgeMaterial, buildingGroup);
+        addMeshWithEdges(
+            rightWallGeo,
+            wallMaterial,
+            edgeMaterial,
+            buildingGroup,
+        );
 
         // Align and position Front Wall panel
         frontWallGeo.translate(0, 0, D / 2 - t);
-        addMeshWithEdges(frontWallGeo, wallMaterial, edgeMaterial, buildingGroup);
+        addMeshWithEdges(
+            frontWallGeo,
+            wallMaterial,
+            edgeMaterial,
+            buildingGroup,
+        );
 
         // Align and position Back Wall panel
         backWallGeo.translate(0, 0, -D / 2);
-        addMeshWithEdges(backWallGeo, wallMaterial, edgeMaterial, buildingGroup);
+        addMeshWithEdges(
+            backWallGeo,
+            wallMaterial,
+            edgeMaterial,
+            buildingGroup,
+        );
 
         // --- PERMANENT FLOOR ---
         const floorGeo = new THREE.PlaneGeometry(W, D);
@@ -235,80 +248,129 @@ function updateBuilding() {
             }
         }
     } else {
-        /* L-SHAPE LOGIC (Hollow) */
-        const legW = W * 0.5;
-        const legD = D * 0.5;
+        // --- 6-PANEL SOLID WALL SYSTEM (L-SHAPE) ---
+        // L-Shape disables the "Apex" roof entirely and scales back to Sloped (Pent)
+        const effectiveRoofType =
+            currentRoofType === "apex" ? "pent" : currentRoofType;
 
-        const outerPoints = [
-            { x: 0, y: 0 },
-            { x: legW, y: 0 },
-            { x: legW, y: legD },
-            { x: W, y: legD },
-            { x: W, y: D },
-            { x: 0, y: D },
-        ];
-        const shape = createSubdividedPath(outerPoints, false);
+        const getZHeight = (z) => {
+            if (effectiveRoofType !== "pent") return H;
+            return H + slopeHeight * ((z + D / 2) / D);
+        };
 
-        const innerPoints = [
-            { x: t, y: t },
-            { x: t, y: D - t },
-            { x: W - t, y: D - t },
-            { x: W - t, y: legD + t },
-            { x: legW - t, y: legD + t },
-            { x: legW - t, y: t },
-        ];
-        const hole = createSubdividedPath(innerPoints, true);
-        shape.holes.push(hole);
+        // 1. Left Wall (Full depth: -D/2 to D/2)
+        const leftWallGeo = createPanelGeo(
+            D,
+            getZHeight(-D / 2),
+            getZHeight(D / 2),
+        );
+        leftWallGeo.rotateY(-Math.PI / 2);
+        leftWallGeo.translate(-W / 2 + t, 0, 0);
+        addMeshWithEdges(
+            leftWallGeo,
+            wallMaterial,
+            edgeMaterial,
+            buildingGroup,
+        );
 
-        const wallGeo = new THREE.ExtrudeGeometry(shape, {
-            steps: 1,
-            depth: H,
-            bevelEnabled: false,
-        });
-        wallGeo.rotateX(-Math.PI / 2);
+        // 2. Front Wall (Full width: -W/2+t to W/2-t)
+        const frontWallGeo = createPanelGeo(
+            W - 2 * t,
+            getZHeight(D / 2 - t),
+            getZHeight(D / 2 - t),
+        );
+        frontWallGeo.translate(0, 0, D / 2 - t);
+        addMeshWithEdges(
+            frontWallGeo,
+            wallMaterial,
+            edgeMaterial,
+            buildingGroup,
+        );
 
-        wallGeo.computeBoundingBox();
-        const centerX = (wallGeo.boundingBox.max.x + wallGeo.boundingBox.min.x) / 2;
-        const centerZ = (wallGeo.boundingBox.max.z + wallGeo.boundingBox.min.z) / 2;
-        wallGeo.translate(-centerX, 0, -centerZ);
+        // 3. Right Wall (Front half of right leg: z=0+t to z=D/2-t)
+        const rightWallGeo = createPanelGeo(
+            D / 2,
+            getZHeight(0),
+            getZHeight(D / 2),
+        );
+        rightWallGeo.rotateY(-Math.PI / 2);
+        rightWallGeo.translate(W / 2, 0, D / 4);
+        addMeshWithEdges(
+            rightWallGeo,
+            wallMaterial,
+            edgeMaterial,
+            buildingGroup,
+        );
 
-        if (currentRoofType === "pent") {
-            const pos = wallGeo.attributes.position;
-            for (let i = 0; i < pos.count; i++) {
-                if (pos.getY(i) > H - 0.01) {
-                    const zPos = pos.getZ(i) + centerZ;
-                    const normalizedZ = zPos / D;
-                    pos.setY(i, H + normalizedZ * slopeHeight);
-                }
-            }
-            wallGeo.computeVertexNormals();
-            pos.needsUpdate = true;
-        }
+        // 4. Inner Back Wall (At notch, runs along z=0+t from x=0+t to x=W/2-t)
+        const innerBackWallGeo = createPanelGeo(
+            W / 2,
+            getZHeight(0),
+            getZHeight(0),
+        );
+        innerBackWallGeo.translate(W / 4, 0, 0);
+        addMeshWithEdges(
+            innerBackWallGeo,
+            wallMaterial,
+            edgeMaterial,
+            buildingGroup,
+        );
 
-        addMeshWithEdges(wallGeo, wallMaterial, edgeMaterial, buildingGroup);
+        // 5. Inner Left Wall (At notch, runs along x=0+t from z=-D/2+t to z=0+t)
+        const innerLeftWallGeo = createPanelGeo(
+            D / 2 + t,
+            getZHeight(-D / 2),
+            getZHeight(0),
+        );
+        innerLeftWallGeo.rotateY(-Math.PI / 2);
+        innerLeftWallGeo.translate(0, 0, -D / 4 + t / 2);
+        addMeshWithEdges(
+            innerLeftWallGeo,
+            wallMaterial,
+            edgeMaterial,
+            buildingGroup,
+        );
 
+        // 6. Back Wall (Right leg only: x=0+t to x=W/2-t)
+        const backWallGeo = createPanelGeo(
+            W / 2 - 2 * t,
+            getZHeight(-D / 2),
+            getZHeight(-D / 2),
+        );
+        backWallGeo.translate(-W / 4, 0, -D / 2);
+        addMeshWithEdges(
+            backWallGeo,
+            wallMaterial,
+            edgeMaterial,
+            buildingGroup,
+        );
+
+        // --- L-SHAPE FLOOR ---
         const floorShape = new THREE.Shape();
-        floorShape.moveTo(0, 0);
-        floorShape.lineTo(legW, 0);
-        floorShape.lineTo(legW, legD);
-        floorShape.lineTo(W, legD);
-        floorShape.lineTo(W, D);
-        floorShape.lineTo(0, D);
+        floorShape.moveTo(-W / 2, D / 2);
+        floorShape.lineTo(0, D / 2);
+        floorShape.lineTo(0, 0);
+        floorShape.lineTo(W / 2, 0);
+        floorShape.lineTo(W / 2, -D / 2);
+        floorShape.lineTo(-W / 2, -D / 2);
+        floorShape.closePath();
+
         const floorGeo = new THREE.ShapeGeometry(floorShape);
         floorGeo.rotateX(-Math.PI / 2);
-        floorGeo.translate(-centerX, 0.01, -centerZ);
         const floor = new THREE.Mesh(floorGeo, floorMaterial);
+        floor.position.y = 0.01;
         buildingGroup.add(floor);
 
+        // --- L-SHAPE ROOF ---
         if (showRoof) {
             const roofShape = new THREE.Shape();
             const o = roofOverhang;
-            roofShape.moveTo(-o, -o);
-            roofShape.lineTo(legW + o, -o);
-            roofShape.lineTo(legW + o, legD - o);
-            roofShape.lineTo(W + o, legD - o);
-            roofShape.lineTo(W + o, D + o);
-            roofShape.lineTo(-o, D + o);
+            roofShape.moveTo(-W / 2 - o, D / 2 + o);
+            roofShape.lineTo(o, D / 2 + o);
+            roofShape.lineTo(o, o);
+            roofShape.lineTo(W / 2 + o, o);
+            roofShape.lineTo(W / 2 + o, -D / 2 - o);
+            roofShape.lineTo(-W / 2 - o, -D / 2 - o);
             roofShape.closePath();
 
             const roofGeo = new THREE.ExtrudeGeometry(roofShape, {
@@ -319,15 +381,12 @@ function updateBuilding() {
             roofGeo.rotateX(-Math.PI / 2);
 
             const roof = new THREE.Mesh(roofGeo, roofMaterial);
-            if (currentRoofType === "pent") {
+            if (effectiveRoofType === "pent") {
                 const angle = -Math.atan2(slopeHeight, D);
-                roof.position.set(-centerX, H - 0.21, -centerZ);
-                roof.geometry.translate(0, 0, -D / 2);
                 roof.rotation.x = angle;
-                roof.geometry.translate(0, 0, D / 2);
-                roof.position.y += slopeHeight / 2;
+                roof.position.y = H + slopeHeight / 2 + 0.05;
             } else {
-                roof.position.set(-centerX, H + 0.05, -centerZ);
+                roof.position.y = H + 0.05;
             }
             buildingGroup.add(roof);
         }
