@@ -304,11 +304,11 @@ function updateBuilding() {
 
         // 4. Inner Back Wall (At notch, runs along z=0+t from x=0+t to x=W/2-t)
         const innerBackWallGeo = createPanelGeo(
-            W / 2,
+            W / 2 - t,
             getZHeight(0),
             getZHeight(0),
         );
-        innerBackWallGeo.translate(W / 4, 0, 0);
+        innerBackWallGeo.translate(W / 4 - t / 2, 0, 0);
         addMeshWithEdges(
             innerBackWallGeo,
             wallMaterial,
