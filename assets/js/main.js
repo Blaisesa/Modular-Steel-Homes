@@ -25,6 +25,25 @@ const wallThickness = 0.15; // 150mm
 const roofThickness = 0.15; // Consolidated roof thickness
 const roofGap = 0.02; // Gap between wall and roof
 
+/* Wall References */
+let walls = {
+    front: null,
+    back: null,
+    left: null,
+    right: null,
+    innerBack: null,
+    innerLeft: null
+};
+
+let wallVisibility = {
+    front: true,
+    back: true,
+    left: true,
+    right: true,
+    innerBack: true,
+    innerLeft: true
+};
+
 function init() {
     const container = document.getElementById("builder-viewport");
     scene = new THREE.Scene();
@@ -194,6 +213,16 @@ function updateBuilding() {
         });
     }
 
+    // Reset wall references
+    walls = {
+        front: null,
+        back: null,
+        left: null,
+        right: null,
+        innerBack: null,
+        innerLeft: null
+    };
+
     const buildingGroup = new THREE.Group();
     const wallMaterial = new THREE.MeshLambertMaterial({
         color: 0x707173,
@@ -236,7 +265,7 @@ function updateBuilding() {
         // Align and position Left Wall panel
         leftWallGeo.rotateY(-Math.PI / 2);
         leftWallGeo.translate(-W / 2 + t, 0, 0);
-        addMeshWithEdges(
+        walls.left = addMeshWithEdges(
             leftWallGeo,
             wallMaterial,
             edgeMaterial,
@@ -246,7 +275,7 @@ function updateBuilding() {
         // Align and position Right Wall panel
         rightWallGeo.rotateY(-Math.PI / 2);
         rightWallGeo.translate(W / 2, 0, 0);
-        addMeshWithEdges(
+        walls.right = addMeshWithEdges(
             rightWallGeo,
             wallMaterial,
             edgeMaterial,
@@ -255,7 +284,7 @@ function updateBuilding() {
 
         // Align and position Front Wall panel
         frontWallGeo.translate(0, 0, D / 2 - t);
-        addMeshWithEdges(
+        walls.front = addMeshWithEdges(
             frontWallGeo,
             wallMaterial,
             edgeMaterial,
@@ -264,7 +293,7 @@ function updateBuilding() {
 
         // Align and position Back Wall panel
         backWallGeo.translate(0, 0, -D / 2);
-        addMeshWithEdges(
+        walls.back = addMeshWithEdges(
             backWallGeo,
             wallMaterial,
             edgeMaterial,
@@ -308,7 +337,7 @@ function updateBuilding() {
         );
         leftWallGeo.rotateY(-Math.PI / 2);
         leftWallGeo.translate(-W / 2 + t, 0, 0);
-        addMeshWithEdges(
+        walls.left = addMeshWithEdges(
             leftWallGeo,
             wallMaterial,
             edgeMaterial,
@@ -322,7 +351,7 @@ function updateBuilding() {
             getZHeight(D / 2 - t),
         );
         frontWallGeo.translate(0, 0, D / 2 - t);
-        addMeshWithEdges(
+        walls.front = addMeshWithEdges(
             frontWallGeo,
             wallMaterial,
             edgeMaterial,
@@ -337,7 +366,7 @@ function updateBuilding() {
         );
         rightWallGeo.rotateY(-Math.PI / 2);
         rightWallGeo.translate(W / 2, 0, D / 4);
-        addMeshWithEdges(
+        walls.right = addMeshWithEdges(
             rightWallGeo,
             wallMaterial,
             edgeMaterial,
@@ -351,7 +380,7 @@ function updateBuilding() {
             getZHeight(0),
         );
         innerBackWallGeo.translate(W / 4 - t / 2, 0, 0);
-        addMeshWithEdges(
+        walls.innerBack = addMeshWithEdges(
             innerBackWallGeo,
             wallMaterial,
             edgeMaterial,
@@ -366,7 +395,7 @@ function updateBuilding() {
         );
         innerLeftWallGeo.rotateY(-Math.PI / 2);
         innerLeftWallGeo.translate(0, 0, -D / 4 + t / 2);
-        addMeshWithEdges(
+        walls.innerLeft = addMeshWithEdges(
             innerLeftWallGeo,
             wallMaterial,
             edgeMaterial,
@@ -380,7 +409,7 @@ function updateBuilding() {
             getZHeight(-D / 2),
         );
         backWallGeo.translate(-W / 4, 0, -D / 2);
-        addMeshWithEdges(
+        walls.back = addMeshWithEdges(
             backWallGeo,
             wallMaterial,
             edgeMaterial,
@@ -423,6 +452,9 @@ function updateBuilding() {
         }
     }
 
+    // Apply saved visibility states
+    applyWallVisibility();
+
     building = buildingGroup;
     scene.add(building);
 }
@@ -431,9 +463,71 @@ function addMeshWithEdges(geo, mat, edgeMat, group) {
     const mesh = new THREE.Mesh(geo, mat);
     const edges = new THREE.EdgesGeometry(geo);
     const line = new THREE.LineSegments(edges, edgeMat);
+    
+    // Store both mesh and edge line together for visibility control
+    mesh.userData.edgeLine = line;
+    
     group.add(mesh);
     group.add(line);
+    
+    return mesh; // Return the mesh so we can reference it
 }
+
+function applyWallVisibility() {
+    Object.keys(walls).forEach(wallName => {
+        // Ensure L-shape inner walls are also toggled together
+        if (wallName === 'front' && walls['innerBack']) {
+            walls['innerBack'].visible = wallVisibility[wallName];
+            if (walls['innerBack'].userData.edgeLine) {
+                walls['innerBack'].userData.edgeLine.visible = wallVisibility[wallName];
+            }
+        }
+        if (wallName === 'left' && walls['innerLeft']) {
+            walls['innerLeft'].visible = wallVisibility[wallName];
+            if (walls['innerLeft'].userData.edgeLine) {
+                walls['innerLeft'].userData.edgeLine.visible = wallVisibility[wallName];
+            }
+        }
+        if (walls[wallName]) {
+            const visible = wallVisibility[wallName];
+            walls[wallName].visible = visible;
+            if (walls[wallName].userData.edgeLine) {
+                walls[wallName].userData.edgeLine.visible = visible;
+            }
+        }
+    });
+}
+
+window.toggleWall = function(wallName) {
+    wallVisibility[wallName] = !wallVisibility[wallName];
+    
+    if (walls[wallName]) {
+        walls[wallName].visible = wallVisibility[wallName];
+        if (walls[wallName].userData.edgeLine) {
+            walls[wallName].userData.edgeLine.visible = wallVisibility[wallName];
+        }
+    }
+
+    if (wallName === 'back' && walls['innerBack']) {
+        walls['innerBack'].visible = wallVisibility[wallName];
+        if (walls['innerBack'].userData.edgeLine) {
+            walls['innerBack'].userData.edgeLine.visible = wallVisibility[wallName];
+        }
+    }
+
+    if (wallName === 'left' && walls['innerLeft'] || wallName === 'right' && walls['innerLeft']) {
+        walls['innerLeft'].visible = wallVisibility[wallName];
+        if (walls['innerLeft'].userData.edgeLine) {
+            walls['innerLeft'].userData.edgeLine.visible = wallVisibility[wallName];
+        }
+    }
+    
+    // Update button state
+    const btn = event ? event.currentTarget : null;
+    if (btn) {
+        btn.classList.toggle('active');
+    }
+};
 
 function fitCamera() {
     const diagonal = Math.sqrt(W * W + D * D);
