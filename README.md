@@ -33,9 +33,6 @@ The project features a responsive 3D viewport with fully integrated global state
 
 The development trajectory is focused on moving from a solid wireframe shell to a hyper-customizable component builder. The upcoming features are categorized by functional engineering goals:
 
-### 1. Architectural Adjustments & Visibility Mechanics
-* **Smart Viewpoint Occlusion (Partial Wall Hiding):** Implement an automated panel visibility handler driven by the camera's orientation. For example, if the user snaps to or orbits around the front view, the front wall panel dynamically hides so the interior can be edited without geometry clipping.
-
 ### 2. Component Framework (Doors, Windows, Utilities)
 * **Aperture Engine:** Implement sub-shape cutting paths to seamlessly puncture doors and windows into specific wall meshes while maintaining clean outer edge outlines.
 * **Component Placement & Scaling:** Enable real-time configuration for the physical dimensions (width, height) and precise placement (X, Y positional coordinates on the wall surface) for doors and windows.
