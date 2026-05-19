@@ -122,7 +122,7 @@ function setupApertureUIListeners() {
 
     const updateFormLayout = () => {
         const type = typeSelect.value;
-        const yRow = document.getElementById('aperture-y-row'); // DOM element containing the Y input
+        const yRow = document.getElementById('aperture-y-row');
         if (yRow) {
             yRow.style.display = (type === 'door') ? 'none' : '';
         }
@@ -134,7 +134,10 @@ function setupApertureUIListeners() {
 
 /* Aperture Management */
 window.addAperture = function() {
-    const type = document.getElementById('aperture-type').value;
+    const typeSelect = document.getElementById('aperture-type');
+    if (!typeSelect) return;
+    
+    const type = typeSelect.value;
     const wallId = document.getElementById('aperture-wall').value;
     const width = parseFloat(document.getElementById('aperture-width').value);
     const height = parseFloat(document.getElementById('aperture-height').value);
@@ -150,7 +153,7 @@ window.addAperture = function() {
 
     const wallDim = getWallDimensions(wallId);
 
-    // 1. Boundary Check: Ensure aperture fits entirely inside the wall boundary geometry
+    // 1. Boundary Check
     const halfW = width / 2;
     const halfH = height / 2;
 
@@ -164,7 +167,7 @@ window.addAperture = function() {
         return;
     }
 
-    // 2. Overlap Check: Block intersecting aperture cutouts to avoid geometry glitch deletions
+    // 2. Overlap Check
     const pad = 0.02; // Safety margin buffer padding
     for (let current of apertures) {
         if (current.wallId === wallId) {
@@ -220,7 +223,6 @@ function createWallShapeWithHoles(wallId, baseShape) {
         const hw = aperture.w / 2;
         const hh = aperture.h / 2;
         
-        // Create rectangular hole (clockwise for THREE.js path subtraction)
         hole.moveTo(aperture.x - hw, aperture.y - hh);
         hole.lineTo(aperture.x + hw, aperture.y - hh);
         hole.lineTo(aperture.x + hw, aperture.y + hh);
@@ -244,73 +246,76 @@ function buildApertureComponents(wallId, wallMesh, buildingGroup) {
         const glassMaterial = new THREE.MeshLambertMaterial({ 
             color: 0x88ccff, 
             transparent: true, 
-            opacity: 0.3 
+            opacity: 0.4 
         });
         const doorMaterial = new THREE.MeshLambertMaterial({ color: 0x8b4513 });
         
-        const frameDepth = wallThickness;
+        // Anti-Z-Fighting: Make frames slightly deeper than the wall so they don't clip faces
+        const frameDepth = wallThickness + 0.01; 
         const frameThickness = 0.05;
         
         if (aperture.type === 'window') {
             // Window frame (4 pieces)
             const topFrame = new THREE.BoxGeometry(aperture.w, frameThickness, frameDepth);
             const bottomFrame = new THREE.BoxGeometry(aperture.w, frameThickness, frameDepth);
-            const leftFrame = new THREE.BoxGeometry(frameThickness, aperture.h, frameDepth);
-            const rightFrame = new THREE.BoxGeometry(frameThickness, aperture.h, frameDepth);
+            const leftFrame = new THREE.BoxGeometry(frameThickness, aperture.h - (frameThickness * 2), frameDepth);
+            const rightFrame = new THREE.BoxGeometry(frameThickness, aperture.h - (frameThickness * 2), frameDepth);
             
             const top = new THREE.Mesh(topFrame, frameMaterial);
-            top.position.set(0, aperture.h / 2, 0);
+            top.position.set(0, (aperture.h / 2) - (frameThickness / 2), 0);
             group.add(top);
             
             const bottom = new THREE.Mesh(bottomFrame, frameMaterial);
-            bottom.position.set(0, -aperture.h / 2, 0);
+            bottom.position.set(0, (-aperture.h / 2) + (frameThickness / 2), 0);
             group.add(bottom);
             
             const left = new THREE.Mesh(leftFrame, frameMaterial);
-            left.position.set(-aperture.w / 2, 0, 0);
+            left.position.set((-aperture.w / 2) + (frameThickness / 2), 0, 0);
             group.add(left);
             
             const right = new THREE.Mesh(rightFrame, frameMaterial);
-            right.position.set(aperture.w / 2, 0, 0);
+            right.position.set((aperture.w / 2) - (frameThickness / 2), 0, 0);
             group.add(right);
             
-            // Glass pane
+            // Glass pane - Thinner than frame and slightly recessed to avoid overlapping face layers
             const glassGeo = new THREE.BoxGeometry(
                 aperture.w - frameThickness * 2, 
                 aperture.h - frameThickness * 2, 
-                frameDepth * 0.8
+                frameDepth * 0.3
             );
             const glass = new THREE.Mesh(glassGeo, glassMaterial);
+            glass.position.set(0, 0, 0);
             group.add(glass);
             
         } else if (aperture.type === 'door') {
-            // Door panel
-            const doorGeo = new THREE.BoxGeometry(aperture.w, aperture.h, frameDepth * 0.9);
+            // Door panel - Recessed inwards by a trace unit fraction
+            const doorGeo = new THREE.BoxGeometry(aperture.w - (frameThickness * 2), aperture.h - frameThickness, frameDepth * 0.7);
             const door = new THREE.Mesh(doorGeo, doorMaterial);
+            door.position.set(0, -frameThickness / 2, 0);
             group.add(door);
             
-            // Door frame
-            const topFrame = new THREE.BoxGeometry(aperture.w + frameThickness, frameThickness, frameDepth);
+            // Door frame (3 pieces: Top, Left, Right)
+            const topFrame = new THREE.BoxGeometry(aperture.w, frameThickness, frameDepth);
             const top = new THREE.Mesh(topFrame, frameMaterial);
-            top.position.set(0, aperture.h / 2 + frameThickness / 2, 0);
+            top.position.set(0, (aperture.h / 2) - (frameThickness / 2), 0);
             group.add(top);
             
-            const leftFrame = new THREE.BoxGeometry(frameThickness, aperture.h + frameThickness, frameDepth);
+            const leftFrame = new THREE.BoxGeometry(frameThickness, aperture.h - frameThickness, frameDepth);
             const left = new THREE.Mesh(leftFrame, frameMaterial);
-            left.position.set(-aperture.w / 2 - frameThickness / 2, 0, 0);
+            left.position.set((-aperture.w / 2) + (frameThickness / 2), -frameThickness / 2, 0);
             group.add(left);
             
-            const rightFrame = new THREE.BoxGeometry(frameThickness, aperture.h + frameThickness, frameDepth);
+            const rightFrame = new THREE.BoxGeometry(frameThickness, aperture.h - frameThickness, frameDepth);
             const right = new THREE.Mesh(rightFrame, frameMaterial);
-            right.position.set(aperture.w / 2 + frameThickness / 2, 0, 0);
+            right.position.set((aperture.w / 2) - (frameThickness / 2), -frameThickness / 2, 0);
             group.add(right);
         }
         
-        // Match base transformations parameters of parent Mesh
+        // Match base transformation coordinates of parent Mesh wall
         group.position.copy(wallMesh.position);
         group.rotation.copy(wallMesh.rotation);
         
-        // Translate locally using ThreeJS directional offset structure
+        // Offset locally based on wall extrusion alignments
         group.translateX(aperture.x);
         group.translateY(aperture.y);
         group.translateZ(wallThickness / 2);
