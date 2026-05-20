@@ -16,45 +16,38 @@ The project features a responsive 3D viewport with fully integrated global state
 * **Permanent Floor System:** Custom shape-matching baseline grids offset slightly on the Y-axis (`0.01`) to prevent Z-fighting against the ambient environment grid.
 
 ### 2. Roof Engineering & Consolidation
-* **Consolidated Roof Generation Engine (`createRoof`):** Unified roof creation logic into a single, highly flexible function that handles extrusion, rotation, translation, and specific alignment matrices for all supported configurations.
-* **L-Shape Scope Reduction:** Programmatically disables the "Apex" roof selection option when the L-shape configuration is active. The application handles this by dynamically updating UI visibility via `updateRoofOptionsVisibility()`, forcing a graceful fallback to a single directional sloped (pent) structure if an incompatible layout is chosen.
-* **Apex Roof (Rectangle Only):** Dynamically places structurally accurate dual sloped roof plates calculated cleanly using trigonometric angles, built-in ridge alignments, and customized edge overhang variables (`roofOverhang`).
-* **Pent Roof:** Single sloped roof structures tracking calculated slope rises (`slopeHeight`) from back-to-front. Includes automatic roof translation adjustments to snap perfectly to structural boundaries.
-* **Toggle System:** Clean visual toggles between exposed frameworks (roofless) and fully clad models.
+* **Consolidated Roof Generation Engine:** Unified logic for all configurations, including dynamic slope calculation for Pent roofs and trigonometric plate placement for Apex roofs.
+* **Scope Constraints:** Programmatic UI updates that disable incompatible features (e.g., Apex roofs on L-shaped footprints).
 
 ### 3. Integrated Aperture Engine (Windows & Doors)
-* **Sub-Shape Cutting Paths:** Utilizes custom 2D path subtractions via `THREE.Shape.holes` to cleanly puncture window and door layouts into specific wall extrusion geometry, automatically tracking clean outline edges.
-* **Anti-Z-Fighting Optimization:** Avoids clipping artifacts by micro-offsetting component geometry—extruding aperture frames slightly deeper than the wall thickness (`wallThickness + 0.01`) and recessing glass panes/panels cleanly inside the frames.
-* **Collision & Boundary Guardrails:** Implemented rigid placement runtime safety checks. The engine actively blocks aperture creation and fires warning handling alerts if components bleed outside the target wall dimensions or overlap with an existing aperture's bounding box margin (`+ 0.02m` buffer padding).
+* **Raycasting Selection Matrix:** Full 3D selection support via `THREE.Raycaster`. Users can now interact directly with meshes in the canvas.
+* **Transform HUD:** Contextual floating widgets for real-time deletion, lateral movement, and proportional resizing.
+* **Collision Guardrails:** Runtime checks to prevent out-of-bounds placement or overlapping component footprints with a `+ 0.02m` buffer.
 
 ### 4. Viewport, UI, & Camera Kinematics
-* **Cinematic Camera Controls:** Multi-axis perspective camera bounding box calculations featuring interactive orbit dragging and smooth interpolating transitions (`lerpSpeed = 0.08`).
-* **Smart Framing (`fitCamera`):** Computes building diagonal metrics on change, ensuring the structure remains dynamically focused and perfectly framed inside the viewport container on scaling.
-* **Preset Target Views:** Instant viewport re-snapping options for Front, Right, Back, Left, Top, and Isometric viewing orientations.
-* **Type-Aware Dynamic UI:** Redesigned the "Windows & Doors" control layout to prioritize component selection typing. Selecting a "Door" conditionally hides the Sill Height ($Y$) controller and dynamically forces the object to snap flush to the baseline floor level ($y = \text{height} / 2$).
-* **Scrollable Workspace Layout:** Enhanced the sidebar wrapper CSS layout with targeted container constraints (`overflow-y: auto`), isolating configuration headers from long, scrollable component asset inventories.
+* **Cinematic Controls:** Smooth `lerp` interpolation for orbit and zoom, with smart camera framing for structural focus.
+* **Type-Aware Dynamic UI:** The configuration panel adapts to component types (e.g., hiding unnecessary sill height controls for floor-based doors).
 
 ---
 
-## Next Steps & Product Roadmap
+## Roadmap: Prioritizing UI/UX Refinement
 
-The development trajectory is focused on moving from a solid wireframe shell to a hyper-customizable component builder. The upcoming features are categorized by functional engineering goals:
+With the core interaction framework stabilized, the development focus is now centered on **UX fluidness and visual accessibility**.
 
-### 1. Interactive Canvas & Component Manipulation
-* **Raycasting Selection Matrix:** Implement a `THREE.Raycaster` pointer system to allow users to directly select existing window and door meshes within the active 3D viewport canvas.
-* **Contextual Transform HUD:** Introduce floating, viewport-aware action widgets upon selection to toggle utility parameters on the fly, including:
-  * **Delete:** Instant purging of selected sub-meshes and reactive reconstruction of the underlying wall shape mask holes.
-  * **Move Location:** Real-time spatial tracking (dragging) along the lateral axis ($X$) of the parent wall.
-  * **Stretch & Resize:** Dynamic inline scaling modifiers to adjust the width and height profiles without recreating components from the sidebar.
+### 1. UI/UX Refinement (Priority Focus)
+* **Canvas Overlay Layer:** Transition the floating HUD from a generic DOM element to a high-fidelity, CSS-animated UI overlay that feels integrated into the viewport.
+* **Intuitive Interaction Cues:** Implement visual hover-states for walls and apertures (e.g., highlighting borders or changing cursor icons) to provide immediate feedback on interactable zones.
+* **Gestural Feedback:** Improve the "feel" of dragging by adding snapping-to-grid visual indicators and non-intrusive haptic/visual alerts when an aperture hits a structural constraint.
+* **Streamlined Asset Library:** Organize the component inventory into clear, collapsable categories with high-quality icons, reducing the cognitive load for new users.
 
 ### 2. Component Framework Expansion
-* **MEP Integration (Electrical & Mechanical):** Add a localized asset placement layer to mount electrical utilities directly onto internal surfaces, including wall sockets, light switches, lighting fixtures, and AC units.
-* **Advanced Glazing & Component Profiles:** Broaden the structural library to support custom multi-panel folding bifold doors, sliding windows, and custom structural glass facades.
+* **MEP Integration:** Asset placement for electrical (sockets, switches) and lighting fixtures.
+* **Advanced Glazing:** Support for bifold doors, sliding windows, and custom facade glass.
 
 ### 3. Customization & Visual Styling
-* **Per-Wall Material Isolation:** Decouple global building attributes to allow distinct configurations, window arrangements, or component layouts unique to individual panels.
-* **Texture & Material Library:** Integrate UV mapping variations and material selections to switch between real-world visual styles across walls, doors, windows, and electrical hardware (e.g., wood cladding, siding types, metal finishes, colors).
+* **Per-Wall Material Isolation:** Support for distinct cladding types on individual panels.
+* **Material Library:** Integration of PBR textures (siding, metal, wood) and a custom color-picker palette.
 
 ### 4. Output Generation & Analytics
-* **Real-Time Cost Calculator:** Write a structural metrics compiler that tracks total volume, panel surface areas, material configurations, and added assets to generate live pricing evaluations.
-* **2D Build Plan Generator:** Create an exporter that flattens individual wall assemblies into dimensioned 2D blueprints or schematic construction diagrams for each face of the structure.
+* **Real-Time Cost Calculator:** Real-time calculation of material costs based on dimensions and added features.
+* **2D Plan Generator:** Flattening of wall assemblies into downloadable 2D blueprints.
