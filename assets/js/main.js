@@ -21,7 +21,7 @@ let showRoof = true;
 const roofOverhang = 0.2;
 const slopeHeight = 0.45;
 const peakHeight = 0.8;
-const wallThickness = 0.15; // 150mm
+const wallThickness = 0.15;
 const roofThickness = 0.15;
 const roofGap = 0.02;
 
@@ -48,6 +48,15 @@ let wallVisibility = {
 let apertures = [];
 let apertureComponents = {};
 
+/* Raycasting & Selection */
+let raycaster = new THREE.Raycaster();
+let mouse = new THREE.Vector2();
+let selectedAperture = null;
+let selectedApertureData = null;
+let isDraggingAperture = false;
+let dragStartPos = { x: 0, y: 0 };
+let resizeMode = null; // 'width', 'height', or null
+
 function init() {
     const container = document.getElementById("builder-viewport");
     scene = new THREE.Scene();
@@ -71,15 +80,223 @@ function init() {
     const grid = new THREE.GridHelper(20, 20, 0xcccccc, 0xeeeeee);
     scene.add(grid);
 
-    // Initialize UI hooks
     setupApertureUIListeners();
+    setupCanvasInteraction(container);
     updateBuilding();
     fitCamera();
     setupInputs(container);
     animate();
 }
 
-/* Helper to get runtime wall width and height dimensions */
+/* Canvas Interaction Setup */
+function setupCanvasInteraction(container) {
+    container.addEventListener('click', onCanvasClick);
+    container.addEventListener('mousemove', onCanvasMouseMove);
+    container.addEventListener('mousedown', onCanvasMouseDown);
+    container.addEventListener('mouseup', onCanvasMouseUp);
+}
+
+function onCanvasClick(event) {
+    if (isFreeRoam || isDraggingAperture) return;
+
+    updateMousePosition(event);
+    raycaster.setFromCamera(mouse, camera);
+
+    // Get all aperture meshes
+    const allApertureMeshes = [];
+    Object.values(apertureComponents).forEach(compArray => {
+        compArray.forEach(group => {
+            group.children.forEach(child => {
+                if (child.isMesh) allApertureMeshes.push(child);
+            });
+        });
+    });
+
+    const intersects = raycaster.intersectObjects(allApertureMeshes, true);
+
+    if (intersects.length > 0) {
+        const clickedMesh = intersects[0].object;
+        const apertureGroup = clickedMesh.parent;
+        
+        // Find the aperture data
+        for (let wallId in apertureComponents) {
+            const index = apertureComponents[wallId].indexOf(apertureGroup);
+            if (index !== -1) {
+                const apertureData = apertures.find(a => 
+                    a.wallId === wallId && 
+                    apertureComponents[wallId][index] === apertureGroup
+                );
+                
+                if (apertureData) {
+                    selectAperture(apertureGroup, apertureData);
+                    return;
+                }
+            }
+        }
+    } else {
+        deselectAperture();
+    }
+}
+
+function updateMousePosition(event) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+}
+
+function selectAperture(group, data) {
+    deselectAperture(); // Clear previous selection
+    
+    selectedAperture = group;
+    selectedApertureData = data;
+    
+    // Add selection highlight
+    group.children.forEach(child => {
+        if (child.isMesh && child.material) {
+            child.userData.originalColor = child.material.color.getHex();
+            child.material.color.setHex(0xffff00); // Yellow highlight
+        }
+    });
+    
+    showTransformHUD(data);
+}
+
+function deselectAperture() {
+    if (selectedAperture) {
+        // Restore original colors
+        selectedAperture.children.forEach(child => {
+            if (child.isMesh && child.userData.originalColor !== undefined) {
+                child.material.color.setHex(child.userData.originalColor);
+            }
+        });
+        selectedAperture = null;
+        selectedApertureData = null;
+    }
+    
+    hideTransformHUD();
+}
+
+function showTransformHUD(data) {
+    let hud = document.getElementById('transform-hud');
+    if (!hud) {
+        hud = document.createElement('div');
+        hud.id = 'transform-hud';
+        hud.className = 'transform-hud';
+        hud.innerHTML = `
+            <div class="hud-title">${data.type === 'window' ? '🪟' : '🚪'} Selected</div>
+            <button class="hud-btn" onclick="deleteSelectedAperture()">🗑️ Delete</button>
+            <button class="hud-btn" onclick="startMove()">↔️ Move</button>
+            <button class="hud-btn" onclick="startResize('width')">↔️ Width</button>
+            <button class="hud-btn" onclick="startResize('height')">↕️ Height</button>
+            <button class="hud-btn" onclick="deselectAperture()">✖️ Close</button>
+        `;
+        document.body.appendChild(hud);
+    }
+    
+    hud.style.display = 'block';
+}
+
+function hideTransformHUD() {
+    const hud = document.getElementById('transform-hud');
+    if (hud) hud.style.display = 'none';
+    resizeMode = null;
+}
+
+window.deleteSelectedAperture = function() {
+    if (!selectedApertureData) return;
+    
+    removeAperture(selectedApertureData.id);
+    deselectAperture();
+};
+
+window.startMove = function() {
+    if (!selectedApertureData) return;
+    isDraggingAperture = true;
+    document.body.style.cursor = 'move';
+};
+
+window.startResize = function(mode) {
+    resizeMode = mode;
+    document.body.style.cursor = mode === 'width' ? 'ew-resize' : 'ns-resize';
+};
+
+function onCanvasMouseDown(event) {
+    if (isDraggingAperture || resizeMode) {
+        dragStartPos.x = event.clientX;
+        dragStartPos.y = event.clientY;
+    }
+}
+
+function onCanvasMouseMove(event) {
+    if (!selectedApertureData) return;
+    
+    const deltaX = (event.clientX - dragStartPos.x) * 0.01;
+    const deltaY = (event.clientY - dragStartPos.y) * 0.01;
+    
+    if (isDraggingAperture) {
+        // Move aperture along X axis
+        const newX = selectedApertureData.x + deltaX;
+        const wallDim = getWallDimensions(selectedApertureData.wallId);
+        const halfW = selectedApertureData.w / 2;
+        
+        // Boundary check
+        if (newX - halfW >= -wallDim.width / 2 && newX + halfW <= wallDim.width / 2) {
+            selectedApertureData.x = newX;
+            dragStartPos.x = event.clientX;
+            updateBuilding();
+            selectAperture(
+                apertureComponents[selectedApertureData.wallId].find(g => 
+                    apertures.find(a => a.id === selectedApertureData.id)
+                ),
+                selectedApertureData
+            );
+        }
+    } else if (resizeMode === 'width') {
+        const newW = Math.max(0.3, selectedApertureData.w + deltaX);
+        const wallDim = getWallDimensions(selectedApertureData.wallId);
+        
+        // Boundary check
+        if (selectedApertureData.x - newW/2 >= -wallDim.width/2 && 
+            selectedApertureData.x + newW/2 <= wallDim.width/2) {
+            selectedApertureData.w = newW;
+            dragStartPos.x = event.clientX;
+            updateBuilding();
+            selectAperture(
+                apertureComponents[selectedApertureData.wallId].find(g => 
+                    apertures.find(a => a.id === selectedApertureData.id)
+                ),
+                selectedApertureData
+            );
+        }
+    } else if (resizeMode === 'height') {
+        const newH = Math.max(0.3, selectedApertureData.h - deltaY);
+        const wallDim = getWallDimensions(selectedApertureData.wallId);
+        
+        // Boundary check
+        if (selectedApertureData.y - newH/2 >= 0 && 
+            selectedApertureData.y + newH/2 <= wallDim.height) {
+            selectedApertureData.h = newH;
+            dragStartPos.y = event.clientY;
+            updateBuilding();
+            selectAperture(
+                apertureComponents[selectedApertureData.wallId].find(g => 
+                    apertures.find(a => a.id === selectedApertureData.id)
+                ),
+                selectedApertureData
+            );
+        }
+    }
+}
+
+function onCanvasMouseUp() {
+    if (isDraggingAperture || resizeMode) {
+        isDraggingAperture = false;
+        resizeMode = null;
+        document.body.style.cursor = 'default';
+        updateApertureList();
+    }
+}
+
 function getWallDimensions(wallId) {
     let wallWidth = W;
     let wallHeight = H;
@@ -94,7 +311,7 @@ function getWallDimensions(wallId) {
             if (currentRoofType === "pent") wallHeight = H + slopeHeight;
             if (currentRoofType === "apex") wallHeight = H + peakHeight;
         }
-    } else { // l-shape
+    } else {
         if (wallId === "front") {
             wallWidth = W - 2 * t;
             wallHeight = H + slopeHeight;
@@ -115,7 +332,6 @@ function getWallDimensions(wallId) {
     return { width: wallWidth, height: wallHeight };
 }
 
-/* Watch UI Type selection to alternate field forms dynamically */
 function setupApertureUIListeners() {
     const typeSelect = document.getElementById('aperture-type');
     if (!typeSelect) return;
@@ -132,7 +348,6 @@ function setupApertureUIListeners() {
     updateFormLayout();
 }
 
-/* Aperture Management */
 window.addAperture = function() {
     const typeSelect = document.getElementById('aperture-type');
     if (!typeSelect) return;
@@ -143,7 +358,6 @@ window.addAperture = function() {
     const height = parseFloat(document.getElementById('aperture-height').value);
     const x = parseFloat(document.getElementById('aperture-x').value);
     
-    // Doors automatically snap to baseline bottom floor level
     let y = 0;
     if (type === 'door') {
         y = height / 2;
@@ -153,7 +367,6 @@ window.addAperture = function() {
 
     const wallDim = getWallDimensions(wallId);
 
-    // 1. Boundary Check
     const halfW = width / 2;
     const halfH = height / 2;
 
@@ -167,8 +380,7 @@ window.addAperture = function() {
         return;
     }
 
-    // 2. Overlap Check
-    const pad = 0.02; // Safety margin buffer padding
+    const pad = 0.02;
     for (let current of apertures) {
         if (current.wallId === wallId) {
             const horizontalOverlap = Math.abs(x - current.x) < ((width / 2) + (current.w / 2) + pad);
@@ -208,13 +420,12 @@ function updateApertureList() {
     
     list.innerHTML = apertures.map(a => `
         <div class="aperture-item">
-            <span>${a.type === 'window' ? '🪟' : '🚪'} ${a.type} on ${a.wallId} (${a.w}×${a.h}m) at X:${a.x.toFixed(2)}, Y:${a.y.toFixed(2)}</span>
+            <span>${a.type === 'window' ? '🪟' : '🚪'} ${a.type} on ${a.wallId} (${a.w.toFixed(2)}×${a.h.toFixed(2)}m) at X:${a.x.toFixed(2)}, Y:${a.y.toFixed(2)}</span>
             <button onclick="removeAperture(${a.id})">×</button>
         </div>
     `).join('');
 }
 
-/* Create aperture holes in wall shape */
 function createWallShapeWithHoles(wallId, baseShape) {
     const wallApertures = apertures.filter(a => a.wallId === wallId);
     
@@ -235,12 +446,13 @@ function createWallShapeWithHoles(wallId, baseShape) {
     return baseShape;
 }
 
-/* Build 3D components for apertures (frames, glass, doors) */
 function buildApertureComponents(wallId, wallMesh, buildingGroup) {
     const wallApertures = apertures.filter(a => a.wallId === wallId);
     
     wallApertures.forEach(aperture => {
         const group = new THREE.Group();
+        group.userData.apertureId = aperture.id;
+        group.userData.wallId = wallId;
         
         const frameMaterial = new THREE.MeshLambertMaterial({ color: 0x2c2c2c });
         const glassMaterial = new THREE.MeshLambertMaterial({ 
@@ -250,12 +462,10 @@ function buildApertureComponents(wallId, wallMesh, buildingGroup) {
         });
         const doorMaterial = new THREE.MeshLambertMaterial({ color: 0x8b4513 });
         
-        // Anti-Z-Fighting: Make frames slightly deeper than the wall so they don't clip faces
         const frameDepth = wallThickness + 0.01; 
         const frameThickness = 0.05;
         
         if (aperture.type === 'window') {
-            // Window frame (4 pieces)
             const topFrame = new THREE.BoxGeometry(aperture.w, frameThickness, frameDepth);
             const bottomFrame = new THREE.BoxGeometry(aperture.w, frameThickness, frameDepth);
             const leftFrame = new THREE.BoxGeometry(frameThickness, aperture.h - (frameThickness * 2), frameDepth);
@@ -277,7 +487,6 @@ function buildApertureComponents(wallId, wallMesh, buildingGroup) {
             right.position.set((aperture.w / 2) - (frameThickness / 2), 0, 0);
             group.add(right);
             
-            // Glass pane - Thinner than frame and slightly recessed to avoid overlapping face layers
             const glassGeo = new THREE.BoxGeometry(
                 aperture.w - frameThickness * 2, 
                 aperture.h - frameThickness * 2, 
@@ -288,13 +497,11 @@ function buildApertureComponents(wallId, wallMesh, buildingGroup) {
             group.add(glass);
             
         } else if (aperture.type === 'door') {
-            // Door panel - Recessed inwards by a trace unit fraction
             const doorGeo = new THREE.BoxGeometry(aperture.w - (frameThickness * 2), aperture.h - frameThickness, frameDepth * 0.7);
             const door = new THREE.Mesh(doorGeo, doorMaterial);
             door.position.set(0, -frameThickness / 2, 0);
             group.add(door);
             
-            // Door frame (3 pieces: Top, Left, Right)
             const topFrame = new THREE.BoxGeometry(aperture.w, frameThickness, frameDepth);
             const top = new THREE.Mesh(topFrame, frameMaterial);
             top.position.set(0, (aperture.h / 2) - (frameThickness / 2), 0);
@@ -311,11 +518,9 @@ function buildApertureComponents(wallId, wallMesh, buildingGroup) {
             group.add(right);
         }
         
-        // Match base transformation coordinates of parent Mesh wall
         group.position.copy(wallMesh.position);
         group.rotation.copy(wallMesh.rotation);
         
-        // Offset locally based on wall extrusion alignments
         group.translateX(aperture.x);
         group.translateY(aperture.y);
         group.translateZ(wallThickness / 2);
@@ -329,7 +534,6 @@ function buildApertureComponents(wallId, wallMesh, buildingGroup) {
     });
 }
 
-/* Wall Geometry Helpers */
 function createSideWallGeometry(widthAlongZ, baseH, roofType, wallId = null) {
     const shape = new THREE.Shape();
     shape.moveTo(-widthAlongZ / 2, 0);
@@ -697,7 +901,6 @@ function fitCamera() {
     targetRadius = Math.max(5, Math.min(25, targetRadius));
 }
 
-/* UI Logic */
 window.toggleRoof = function () {
     showRoof = !showRoof;
     const btn = document.getElementById("roof-toggle");
