@@ -98,6 +98,16 @@ function init() {
     animate();
 }
 
+// Reset helper function
+function resetApertures() {
+    apertures = [];
+    apertureComponents = {};
+    selectedApertureData = null;
+    hideTransformHUD();
+    updateApertureList();
+    updateBuilding();
+}
+
 /* Canvas Interaction Setup */
 function setupCanvasInteraction(container) {
     container.addEventListener('click', onCanvasClick);
@@ -908,6 +918,9 @@ window.setRoof = function (type, e) {
 window.setShape = function (type, e) {
     const evt = e || window.event;
     currentShapeType = type;
+
+    resetApertures();
+    
     document.querySelectorAll(".sidebar-nav .nav-section:first-child .style-option").forEach((o) => o.classList.remove("active"));
     if (evt && evt.currentTarget) evt.currentTarget.classList.add("active");
     
