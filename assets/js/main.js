@@ -329,12 +329,12 @@ function showTransformHUD(data) {
     
     hud.innerHTML = `
         <div class="hud-label">${data.type.toUpperCase()}</div>
-        <button class="hud-pill-btn" onclick="startMove()" title="Move">Move</button>
-        <button class="hud-pill-btn" onclick="startResize('width')" title="Resize Width">Width</button>
-        <button class="hud-pill-btn" onclick="startResize('height')" title="Resize Height">Height</button>
+        <button class="hud-pill-btn" onclick="startMove()" title="Move">↔️</button>
+        <button class="hud-pill-btn" onclick="startResize('width')" title="Resize Width">📏</button>
+        <button class="hud-pill-btn" onclick="startResize('height')" title="Resize Height">📐</button>
         <div class="hud-pill-divider"></div>
-        <button class="hud-pill-btn danger" onclick="deleteSelectedAperture()" title="Delete">Delete</button>
-        <button class="hud-pill-btn close" onclick="deselectAperture()" title="Close">✕</button>
+        <button class="hud-pill-btn danger" onclick="deleteSelectedAperture()" title="Delete">🗑️</button>
+        <button class="hud-pill-btn close" onclick="deselectAperture()" title="Close">✖️</button>
     `;
     hud.style.display = 'flex';
 }
