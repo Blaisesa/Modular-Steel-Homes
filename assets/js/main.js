@@ -65,9 +65,7 @@ window.toggleLibraryCategory = function(header) {
     if (category) category.classList.toggle('expanded');
 };
 
-
 // NEW DRAG & DROP PLACEMENT LOGIC
-
 window.enterPlacementMode = function(type, preset) {
     deselectAperture();
     const config = APERTURE_PRESETS[type][preset];
@@ -454,9 +452,21 @@ function updateApertureList() {
 }
 
 function updateQuickStats() {
-    const area = currentShapeType === "rectangle" ? (W * D) : (W * D * 0.75);
+    // Area calculation based on shape logic in updateBuilding
+    let area = 0;
+    if (currentShapeType === "rectangle") {
+        area = W * D;
+    } else {
+        // L-shape floor logic: 
+        // rectangle 1: (-W/2 to 0, -D/2 to D/2) -> W/2 * D
+        // rectangle 2: (0 to W/2, -D/2 to 0) -> W/2 * D/2
+        area = (W/2 * D) + (W/2 * D/2);
+    }
+    
     const areaLabel = document.getElementById('stat-area');
-    if (areaLabel) areaLabel.innerText = area.toFixed(1) + ' m²';
+    if (areaLabel) {
+        areaLabel.innerText = area.toFixed(1) + ' m²';
+    }
 }
 
 function isValidAperture(candidate) {
@@ -840,6 +850,7 @@ window.updateDim = function (prop, val) {
     const label = document.getElementById(`val-${prop.toLowerCase()}`);
     if (label) label.innerText = val;
     updateBuilding();
+    updateQuickStats(); // Ensure area updates in real-time
     fitCamera();
 };
 
