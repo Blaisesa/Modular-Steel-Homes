@@ -1,63 +1,30 @@
 let scene, camera, renderer, building;
-let currentAngle = -Math.PI / 4,
-    targetAngle = -Math.PI / 4;
-let currentVerticalAngle = 0.25,
-    targetVerticalAngle = 0.25;
-let radius = 12,
-    targetRadius = 12,
-    isFreeRoam = false,
-    isDragging = false;
-let previousX = 0,
-    previousY = 0;
+let currentAngle = -Math.PI / 4, targetAngle = -Math.PI / 4;
+let currentVerticalAngle = 0.25, targetVerticalAngle = 0.25;
+let radius = 12, targetRadius = 12;
+let isFreeRoam = false, isDragging = false;
+let previousX = 0, previousY = 0;
 
-/* Global Dimensions & States */
 const lerpSpeed = 0.08;
-let W = 6,
-    H = 2.8,
-    D = 4;
+let W = 6, H = 2.8, D = 4;
 let currentShapeType = "rectangle";
 let currentRoofType = "pent";
 let showRoof = true;
-const roofOverhang = 0.2;
-const slopeHeight = 0.45;
-const peakHeight = 0.8;
-const wallThickness = 0.15;
-const roofThickness = 0.15;
-const roofGap = 0.02;
+const roofOverhang = 0.2, slopeHeight = 0.45, peakHeight = 0.8;
+const wallThickness = 0.15, roofThickness = 0.17, roofGap = 0.01;
 
-/* Wall References */
-let walls = {
-    front: null,
-    back: null,
-    left: null,
-    right: null,
-    innerBack: null,
-    innerLeft: null
-};
-
-let wallVisibility = {
-    front: true,
-    back: true,
-    left: true,
-    right: true,
-    innerBack: true,
-    innerLeft: true
-};
+let walls = { front: null, back: null, left: null, right: null, innerBack: null, innerLeft: null };
+let wallVisibility = { front: true, back: true, left: true, right: true, innerBack: true, innerLeft: true };
 
 const wallNormals = {
-    front: new THREE.Vector3(0, 0, 1),
-    back: new THREE.Vector3(0, 0, -1),
-    left: new THREE.Vector3(-1, 0, 0),
-    right: new THREE.Vector3(1, 0, 0),
-    innerBack: new THREE.Vector3(0, 0, 1),
-    innerLeft: new THREE.Vector3(1, 0, 0)
+    front: new THREE.Vector3(0, 0, 1), back: new THREE.Vector3(0, 0, -1),
+    left: new THREE.Vector3(-1, 0, 0), right: new THREE.Vector3(1, 0, 0),
+    innerBack: new THREE.Vector3(0, 0, 1), innerLeft: new THREE.Vector3(1, 0, 0)
 };
 
-/* Aperture System */
 let apertures = [];
 let apertureComponents = {};
 
-/* Raycasting & Selection */
 let raycaster = new THREE.Raycaster();
 let mouse = new THREE.Vector2();
 let selectedApertureData = null;
@@ -67,103 +34,84 @@ let dragPlane = new THREE.Plane();
 let dragStartPos = new THREE.Vector3();
 let dragStartAperture = null;
 
-function init() {
-    const container = document.getElementById("builder-viewport");
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf4f4f4);
+// Placement Mode Variables
+let isPlacingNewAperture = false;
+let placementConfig = null;
+let ghostMesh = null;
+let currentHoveredWall = null;
 
-    camera = new THREE.PerspectiveCamera(
-        75,
-        container.clientWidth / container.clientHeight,
-        0.1,
-        1000,
-    );
-    renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(container.clientWidth, container.clientHeight);
-    container.appendChild(renderer.domElement);
-
-    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-    const light = new THREE.DirectionalLight(0xffffff, 0.8);
-    light.position.set(5, 10, 7);
-    scene.add(light);
-
-    const grid = new THREE.GridHelper(20, 20, 0xcccccc, 0xeeeeee);
-    scene.add(grid);
-
-    setupApertureUIListeners();
-    setupCanvasInteraction(container);
-    updateBuilding();
-    fitCamera();
-    setupInputs(container);
-    animate();
-}
-
-// Reset helper function
-function resetApertures() {
-    apertures = [];
-    apertureComponents = {};
-    selectedApertureData = null;
-    hideTransformHUD();
-    updateApertureList();
-    updateBuilding();
-}
-
-/* Canvas Interaction Setup */
-function setupCanvasInteraction(container) {
-    container.addEventListener('click', onCanvasClick);
-    container.addEventListener('mousemove', onCanvasMouseMove);
-    container.addEventListener('mousedown', onCanvasMouseDown);
-    container.addEventListener('mouseup', onCanvasMouseUp);
-}
-
-function onCanvasClick(event) {
-    if (isDraggingAperture || resizeMode) return;
-
-    updateMousePosition(event);
-    raycaster.setFromCamera(mouse, camera);
-
-    const allApertureMeshes = [];
-    Object.values(apertureComponents).forEach(compArray => {
-        compArray.forEach(group => {
-            group.children.forEach(child => {
-                if (child.isMesh) allApertureMeshes.push(child);
-            });
-        });
-    });
-
-    const intersects = raycaster.intersectObjects(allApertureMeshes, true);
-
-    if (intersects.length > 0) {
-        const clickedMesh = intersects[0].object;
-        const apertureGroup = clickedMesh.parent;
-        
-        for (let wallId in apertureComponents) {
-            const index = apertureComponents[wallId].indexOf(apertureGroup);
-            if (index !== -1) {
-                const apertureData = apertures.find(a => 
-                    a.wallId === wallId && 
-                    apertureComponents[wallId][index] === apertureGroup
-                );
-                
-                if (apertureData) {
-                    if (isFreeRoam) {
-                        window.toggleFreeRoam();
-                        const viewMap = {
-                            front: 'front', innerBack: 'front',
-                            back: 'back',
-                            left: 'left',
-                            right: 'right', innerLeft: 'right'
-                        };
-                        window.rotateTo(viewMap[apertureData.wallId]);
-                    }
-                    selectAperture(apertureData);
-                    return;
-                }
-            }
-        }
-    } else {
-        deselectAperture();
+const APERTURE_PRESETS = {
+    window: {
+        standard: { w: 1.2, h: 1.5, y: 1.4 },
+        large: { w: 2.0, h: 1.8, y: 1.5 },
+        small: { w: 0.8, h: 1.0, y: 1.3 }
+    },
+    door: {
+        standard: { w: 0.9, h: 2.1 },
+        double: { w: 1.8, h: 2.1 }
     }
+};
+
+window.toggleLibraryCategory = function(header) {
+    const category = header.parentElement;
+    if (category) category.classList.toggle('expanded');
+};
+
+// NEW DRAG & DROP PLACEMENT LOGIC
+
+window.enterPlacementMode = function(type, preset) {
+    deselectAperture();
+    const config = APERTURE_PRESETS[type][preset];
+    placementConfig = { type, ...config };
+    isPlacingNewAperture = true;
+    
+    document.getElementById('placement-ui').classList.remove('hidden');
+    document.body.classList.add('placing-aperture');
+
+    if (window.innerWidth <= 768) {
+        window.toggleSidebar(); // Auto-close sidebar on mobile to view canvas
+    }
+    
+    createGhostMesh();
+};
+
+window.exitPlacementMode = function() {
+    isPlacingNewAperture = false;
+    placementConfig = null;
+    currentHoveredWall = null;
+    document.getElementById('placement-ui').classList.add('hidden');
+    document.body.classList.remove('placing-aperture');
+    
+    if (ghostMesh) {
+        scene.remove(ghostMesh);
+        ghostMesh.geometry.dispose();
+        ghostMesh.material.dispose();
+        ghostMesh = null;
+    }
+};
+
+function createGhostMesh() {
+    if (ghostMesh) scene.remove(ghostMesh);
+    
+    const geo = new THREE.BoxGeometry(placementConfig.w, placementConfig.h, wallThickness * 2);
+    const mat = new THREE.MeshBasicMaterial({ 
+        color: 0x00ff00, 
+        transparent: true, 
+        opacity: 0.5,
+        depthWrite: false
+    });
+    ghostMesh = new THREE.Mesh(geo, mat);
+    ghostMesh.visible = false; 
+    scene.add(ghostMesh);
+}
+
+// POINTER EVENTS & CANVAS INTERACTION
+function setupCanvasInteraction(container) {
+    // Touch/Pointer Native
+    container.style.touchAction = 'none'; 
+    container.addEventListener('pointerdown', onPointerDown);
+    container.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
 }
 
 function updateMousePosition(event) {
@@ -172,46 +120,213 @@ function updateMousePosition(event) {
     mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 }
 
-function selectAperture(data) {
-    selectedApertureData = data;
-    showTransformHUD(data);
-    updateBuilding(); 
+function getWallMeshes() {
+    return Object.keys(walls).map(k => walls[k]).filter(m => m && m.visible);
 }
 
-function deselectAperture() {
-    selectedApertureData = null;
-    hideTransformHUD();
-    updateBuilding();
+function onPointerDown(event) {
+    updateMousePosition(event);
+    raycaster.setFromCamera(mouse, camera);
+
+    if (isPlacingNewAperture) {
+        if (currentHoveredWall && ghostMesh && ghostMesh.visible && ghostMesh.material.color.getHex() === 0x00ff00) {
+            // Valid drop! Convert ghost position to real aperture
+            const dropConfig = {
+                id: Date.now(),
+                type: placementConfig.type,
+                wallId: currentHoveredWall.userData.wallId,
+                w: placementConfig.w,
+                h: placementConfig.h,
+                x: ghostMesh.userData.localX,
+                y: ghostMesh.userData.localY
+            };
+            apertures.push(dropConfig);
+            updateApertureList();
+            updateQuickStats();
+            updateBuilding();
+            exitPlacementMode();
+            showConstraintAlert(`✓ Added successfully!`, 'success');
+        }
+        return;
+    }
+
+    if (selectedApertureData && (isDraggingAperture || resizeMode)) {
+        const normal = wallNormals[selectedApertureData.wallId];
+        const wallMesh = walls[selectedApertureData.wallId];
+        const wallWorldPos = new THREE.Vector3();
+        wallMesh.getWorldPosition(wallWorldPos);
+        
+        dragPlane.setFromNormalAndCoplanarPoint(normal, wallWorldPos);
+        raycaster.ray.intersectPlane(dragPlane, dragStartPos);
+        dragStartAperture = JSON.parse(JSON.stringify(selectedApertureData));
+        
+        if (event.pointerType !== 'mouse') event.preventDefault(); // Stop orbit on touch drag
+        return;
+    }
+
+    // Try selecting an aperture
+    const allApertureMeshes = [];
+    Object.values(apertureComponents).forEach(compArray => {
+        compArray.forEach(group => {
+            group.children.forEach(child => { if (child.isMesh) allApertureMeshes.push(child); });
+        });
+    });
+
+    const intersects = raycaster.intersectObjects(allApertureMeshes, true);
+    if (intersects.length > 0) {
+        let obj = intersects[0].object;
+        // Traverse up to find the group containing the aperture data
+        while (obj && !obj.userData.apertureId && obj.parent) {
+            obj = obj.parent;
+        }
+
+        if (obj && obj.userData.apertureId) {
+            const apertureData = apertures.find(a => a.id === obj.userData.apertureId);
+            if (apertureData) {
+                if (isFreeRoam) {
+                    window.toggleFreeRoam();
+                    const viewMap = { front: 'front', innerBack: 'front', back: 'back', left: 'left', right: 'right', innerLeft: 'right' };
+                    window.rotateTo(viewMap[apertureData.wallId]);
+                }
+                selectAperture(apertureData);
+                return;
+            }
+        }
+    } else {
+        deselectAperture();
+    }
+
+    // Regular orbit drag init
+    if (isFreeRoam && !selectedApertureData && !isPlacingNewAperture) {
+        isDragging = true;
+        previousX = event.clientX;
+        previousY = event.clientY;
+    }
 }
 
+function onPointerMove(event) {
+    if (isPlacingNewAperture) {
+        updateMousePosition(event);
+        raycaster.setFromCamera(mouse, camera);
+        const wallIntersects = raycaster.intersectObjects(getWallMeshes(), false);
+        
+        if (wallIntersects.length > 0) {
+            const hit = wallIntersects[0];
+            const hitWallMesh = hit.object;
+            const wallId = hitWallMesh.userData.wallId;
+            currentHoveredWall = hitWallMesh;
+            
+            // Math: World Raycast hit -> Wall Local Space
+            const localHit = hitWallMesh.worldToLocal(hit.point.clone());
+            
+            let candY = placementConfig.type === 'door' ? placementConfig.h / 2 : localHit.y;
+            
+            const candidate = {
+                id: 'temp', wallId: wallId, type: placementConfig.type,
+                w: placementConfig.w, h: placementConfig.h,
+                x: localHit.x, y: candY
+            };
+
+            const isValid = isValidAperture(candidate);
+            ghostMesh.material.color.setHex(isValid ? 0x00ff00 : 0xff0000);
+            ghostMesh.position.copy(hitWallMesh.position);
+            ghostMesh.rotation.copy(hitWallMesh.rotation);
+            ghostMesh.translateX(localHit.x);
+            ghostMesh.translateY(candY);
+            ghostMesh.translateZ(wallThickness / 2);
+            ghostMesh.visible = true;
+            ghostMesh.userData = { localX: localHit.x, localY: candY };
+        } else {
+            ghostMesh.visible = false;
+            currentHoveredWall = null;
+        }
+        return;
+    }
+
+    if (selectedApertureData && (isDraggingAperture || resizeMode) && dragStartAperture) {
+        updateMousePosition(event);
+        raycaster.setFromCamera(mouse, camera);
+        let currentPt = new THREE.Vector3();
+        
+        if (raycaster.ray.intersectPlane(dragPlane, currentPt)) {
+            let delta = currentPt.clone().sub(dragStartPos);
+            let localDeltaX = 0, localDeltaY = delta.y; 
+            const wid = selectedApertureData.wallId;
+            if (wid === 'front' || wid === 'innerBack') localDeltaX = delta.x;
+            if (wid === 'back') localDeltaX = delta.x; 
+            if (wid === 'left') localDeltaX = delta.z; 
+            if (wid === 'right' || wid === 'innerLeft') localDeltaX = delta.z;
+
+            let candidate = JSON.parse(JSON.stringify(dragStartAperture));
+            if (isDraggingAperture) {
+                candidate.x += localDeltaX;
+                candidate.y += localDeltaY;
+            } else if (resizeMode === 'width') {
+                candidate.w = Math.max(0.3, dragStartAperture.w + localDeltaX);
+            } else if (resizeMode === 'height') {
+                candidate.h = Math.max(0.3, dragStartAperture.h + localDeltaY);
+                if (candidate.type === 'door') candidate.y = candidate.h / 2;
+            }
+
+            if (isValidAperture(candidate)) {
+                const index = apertures.findIndex(a => a.id === candidate.id);
+                if (index !== -1) {
+                    apertures[index] = candidate;
+                    selectedApertureData = candidate;
+                    updateBuilding();
+                }
+            }
+        }
+        return;
+    }
+
+    // Camera Orbit
+    if (isDragging && isFreeRoam) {
+        targetAngle += (event.clientX - previousX) * 0.005;
+        targetVerticalAngle += (event.clientY - previousY) * 0.005;
+        targetVerticalAngle = Math.max(-1.4, Math.min(1.4, targetVerticalAngle));
+        previousX = event.clientX;
+        previousY = event.clientY;
+    }
+}
+
+function onPointerUp() {
+    isDragging = false;
+    if (isDraggingAperture || resizeMode) {
+        isDraggingAperture = false;
+        resizeMode = null;
+        dragStartAperture = null;
+        document.body.classList.remove('dragging-aperture', 'resizing-width', 'resizing-height');
+        updateApertureList();
+        updateQuickStats();
+    }
+}
+
+// PILL HUD & NOTIFICATIONS
 function showTransformHUD(data) {
+    let overlay = document.getElementById('canvas-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'canvas-overlay';
+        overlay.className = 'canvas-overlay';
+        document.getElementById("builder-viewport").appendChild(overlay);
+    }
+    
     let hud = document.getElementById('transform-hud');
     if (!hud) {
         hud = document.createElement('div');
         hud.id = 'transform-hud';
-        hud.className = 'transform-hud';
-        hud.style.position = 'absolute';
-        hud.style.transform = 'translate(-50%, -100%)';
-        hud.style.background = 'white';
-        hud.style.padding = '10px';
-        hud.style.borderRadius = '8px';
-        hud.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-        hud.style.zIndex = '1000';
-        hud.style.display = 'flex';
-        hud.style.flexDirection = 'column';
-        hud.style.gap = '5px';
-        document.body.appendChild(hud);
+        hud.className = 'hud-pill';
+        overlay.appendChild(hud);
     }
     
     hud.innerHTML = `
-        <div style="font-weight:bold; text-align:center; margin-bottom:5px;">
-            ${data.type === 'window' ? '🪟' : '🚪'} Selected
-        </div>
-        <button onclick="deleteSelectedAperture()">🗑️ Delete</button>
-        <button onclick="startMove()">↔️ Move</button>
-        <button onclick="startResize('width')">↔️ Width</button>
-        <button onclick="startResize('height')">↕️ Height</button>
-        <button onclick="deselectAperture()">✖️ Close</button>
+        <button class="hud-pill-btn" onclick="startMove()" title="Move">↔️</button>
+        <button class="hud-pill-btn" onclick="startResize('width')" title="Resize Width">📏</button>
+        <button class="hud-pill-btn" onclick="startResize('height')" title="Resize Height">📐</button>
+        <div class="hud-pill-divider"></div>
+        <button class="hud-pill-btn danger" onclick="deleteSelectedAperture()" title="Delete">🗑️</button>
+        <button class="hud-pill-btn" onclick="deselectAperture()" title="Close">✖️</button>
     `;
     hud.style.display = 'flex';
 }
@@ -221,7 +336,7 @@ function hideTransformHUD() {
     if (hud) hud.style.display = 'none';
     resizeMode = null;
     isDraggingAperture = false;
-    document.body.style.cursor = 'default';
+    document.body.classList.remove('dragging-aperture', 'resizing-width', 'resizing-height');
 }
 
 function updateTransformHUDPosition() {
@@ -237,14 +352,12 @@ function updateTransformHUDPosition() {
 
     const pos = new THREE.Vector3();
     currentGroup.getWorldPosition(pos);
-    pos.y += selectedApertureData.h / 2 + 0.4; 
-    
+    pos.y += selectedApertureData.h / 2 + 0.5; 
     pos.project(camera);
     
     const container = document.getElementById("builder-viewport");
     if (!container) return;
     const rect = container.getBoundingClientRect();
-    
     const x = (pos.x * 0.5 + 0.5) * rect.width + rect.left;
     const y = (pos.y * -0.5 + 0.5) * rect.height + rect.top;
     
@@ -253,6 +366,40 @@ function updateTransformHUDPosition() {
         hud.style.left = `${x}px`;
         hud.style.top = `${y}px`;
     }
+}
+
+function showConstraintAlert(message, type = 'error') {
+    let overlay = document.getElementById('canvas-overlay');
+    if (!overlay) return;
+    
+    let alert = document.getElementById('constraint-alert');
+    if (!alert) {
+        alert = document.createElement('div');
+        alert.id = 'constraint-alert';
+        alert.className = 'constraint-alert';
+        overlay.appendChild(alert);
+    }
+    
+    alert.style.background = type === 'success' ? 'linear-gradient(135deg, #51cf66 0%, #37b24d 100%)' : 'linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%)';
+    alert.innerHTML = `<span class="constraint-alert-icon">${type === 'success' ? '✓' : '⚠️'}</span><span>${message}</span>`;
+    alert.classList.add('visible');
+    
+    if (alert.dataset.timeoutId) clearTimeout(parseInt(alert.dataset.timeoutId));
+    alert.dataset.timeoutId = setTimeout(() => alert.classList.remove('visible'), 2500);
+}
+
+// CORE DATA METHODS
+
+function selectAperture(data) {
+    selectedApertureData = data;
+    showTransformHUD(data);
+    updateBuilding();
+}
+
+function deselectAperture() {
+    selectedApertureData = null;
+    hideTransformHUD();
+    updateBuilding();
 }
 
 window.deleteSelectedAperture = function() {
@@ -265,86 +412,46 @@ window.startMove = function() {
     if (!selectedApertureData) return;
     isDraggingAperture = true;
     resizeMode = null;
-    document.body.style.cursor = 'move';
+    document.body.classList.add('dragging-aperture');
 };
 
 window.startResize = function(mode) {
     if (!selectedApertureData) return;
     resizeMode = mode;
     isDraggingAperture = false;
-    document.body.style.cursor = mode === 'width' ? 'ew-resize' : 'ns-resize';
+    document.body.classList.add(mode === 'width' ? 'resizing-width' : 'resizing-height');
 };
 
-function onCanvasMouseDown(event) {
-    if (selectedApertureData && (isDraggingAperture || resizeMode)) {
-        updateMousePosition(event);
-        raycaster.setFromCamera(mouse, camera);
+window.removeAperture = function(id) {
+    apertures = apertures.filter(a => a.id !== id);
+    updateApertureList();
+    updateQuickStats();
+    updateBuilding();
+};
 
-        const normal = wallNormals[selectedApertureData.wallId];
-        const wallMesh = walls[selectedApertureData.wallId];
-        const wallWorldPos = new THREE.Vector3();
-        wallMesh.getWorldPosition(wallWorldPos);
-        
-        dragPlane.setFromNormalAndCoplanarPoint(normal, wallWorldPos);
-        raycaster.ray.intersectPlane(dragPlane, dragStartPos);
-        
-        dragStartAperture = JSON.parse(JSON.stringify(selectedApertureData));
-    }
+function resetApertures() {
+    apertures = [];
+    apertureComponents = {};
+    selectedApertureData = null;
+    hideTransformHUD();
+    updateApertureList();
+    updateQuickStats();
+    updateBuilding();
 }
 
-function onCanvasMouseMove(event) {
-    if (selectedApertureData && (isDraggingAperture || resizeMode) && dragStartAperture) {
-        updateMousePosition(event);
-        raycaster.setFromCamera(mouse, camera);
-        
-        let currentPt = new THREE.Vector3();
-        if (raycaster.ray.intersectPlane(dragPlane, currentPt)) {
-            let delta = currentPt.clone().sub(dragStartPos);
-            
-            let localDeltaX = 0;
-            let localDeltaY = delta.y; 
-            
-            const wid = selectedApertureData.wallId;
-            // Reversed directions to map cleanly to freeroam
-            if (wid === 'front' || wid === 'innerBack') localDeltaX = delta.x;
-            if (wid === 'back') localDeltaX = delta.x; 
-            if (wid === 'left') localDeltaX = delta.z; 
-            if (wid === 'right' || wid === 'innerLeft') localDeltaX = delta.z;
-
-            let candidate = JSON.parse(JSON.stringify(dragStartAperture));
-
-            if (isDraggingAperture) {
-                candidate.x += localDeltaX;
-                candidate.y += localDeltaY;
-            } else if (resizeMode === 'width') {
-                candidate.w = Math.max(0.3, dragStartAperture.w + localDeltaX);
-            } else if (resizeMode === 'height') {
-                candidate.h = Math.max(0.3, dragStartAperture.h + localDeltaY);
-                if (candidate.type === 'door') {
-                    candidate.y = candidate.h / 2;
-                }
-            }
-
-            if (isValidAperture(candidate)) {
-                const index = apertures.findIndex(a => a.id === candidate.id);
-                if (index !== -1) {
-                    apertures[index] = candidate;
-                    selectedApertureData = candidate;
-                    updateBuilding();
-                }
-            }
-        }
-    }
+function updateApertureList() {
+    // Legacy list removal, now fully visual
 }
 
-function onCanvasMouseUp() {
-    if (isDraggingAperture || resizeMode) {
-        isDraggingAperture = false;
-        resizeMode = null;
-        dragStartAperture = null;
-        document.body.style.cursor = 'default';
-        updateApertureList();
-    }
+function updateQuickStats() {
+    const area = currentShapeType === "rectangle" ? (W * D) : (W * D * 0.75);
+    const areaLabel = document.getElementById('stat-area');
+    if (areaLabel) areaLabel.innerText = area.toFixed(1) + ' m²';
+
+    const windows = apertures.filter(a => a.type === 'window').length;
+    const doors = apertures.filter(a => a.type === 'door').length;
+    const countLabel = document.getElementById('stat-apertures');
+    if (countLabel) countLabel.innerText = `${windows}W / ${doors}D`;
 }
 
 function isValidAperture(candidate) {
@@ -357,25 +464,22 @@ function isValidAperture(candidate) {
         (candidate.x + halfW) > wallDim.width / 2 || 
         (candidate.y - halfH) < 0 || 
         (candidate.y + halfH) > wallDim.height
-    ) {
-        return false;
-    }
+    ) return false;
 
     const pad = 0.02;
     for (let current of apertures) {
         if (current.id !== candidate.id && current.wallId === candidate.wallId) {
-            const horizontalOverlap = Math.abs(candidate.x - current.x) < ((candidate.w / 2) + (current.w / 2) + pad);
-            const verticalOverlap = Math.abs(candidate.y - current.y) < ((candidate.h / 2) + (current.h / 2) + pad);
-            
-            if (horizontalOverlap && verticalOverlap) return false;
+            const horiz = Math.abs(candidate.x - current.x) < ((candidate.w / 2) + (current.w / 2) + pad);
+            const vert = Math.abs(candidate.y - current.y) < ((candidate.h / 2) + (current.h / 2) + pad);
+            if (horiz && vert) return false;
         }
     }
     return true;
 }
 
+// MESH COMPILATION
 function getWallDimensions(wallId) {
-    let wallWidth = W;
-    let wallHeight = H;
+    let wallWidth = W, wallHeight = H;
     const t = wallThickness;
 
     if (currentShapeType === "rectangle") {
@@ -384,262 +488,120 @@ function getWallDimensions(wallId) {
             if (wallId === "front" && currentRoofType === "pent") wallHeight = H + slopeHeight;
         } else if (wallId === "left" || wallId === "right") {
             wallWidth = D;
-            // Prevent holes outside geometry (Triangulation Error / Deform Bug Fix)
-            // Hard restrict aperture placement bounds to rectangular safe height
             wallHeight = H;
         }
     } else {
-        if (wallId === "front") {
-            wallWidth = W - 2 * t;
-            wallHeight = currentRoofType === "pent" ? H + slopeHeight : H;
-        } else if (wallId === "back") {
-            wallWidth = W / 2 - 2 * t;
-            wallHeight = H;
-        } else if (wallId === "left") {
-            wallWidth = D;
-            wallHeight = H;
-        } else if (wallId === "right") {
-            wallWidth = D / 2;
-            wallHeight = H;
-        } else if (wallId === "innerBack") {
-            wallWidth = W / 2 - t;
-            wallHeight = H;
-        } else if (wallId === "innerLeft") {
-            wallWidth = D / 2 + t;
-            wallHeight = H;
-        }
+        if (wallId === "front") { wallWidth = W - 2 * t; wallHeight = currentRoofType === "pent" ? H + slopeHeight : H; }
+        else if (wallId === "back") { wallWidth = W / 2 - 2 * t; wallHeight = H; }
+        else if (wallId === "left") { wallWidth = D; wallHeight = H; }
+        else if (wallId === "right") { wallWidth = D / 2; wallHeight = H; }
+        else if (wallId === "innerBack") { wallWidth = W / 2 - t; wallHeight = H; }
+        else if (wallId === "innerLeft") { wallWidth = D / 2 + t; wallHeight = H; }
     }
     return { width: wallWidth, height: wallHeight };
 }
 
-function setupApertureUIListeners() {
-    const typeSelect = document.getElementById('aperture-type');
-    if (!typeSelect) return;
-
-    const updateFormLayout = () => {
-        const type = typeSelect.value;
-        const yRow = document.getElementById('aperture-y-row');
-        if (yRow) yRow.style.display = (type === 'door') ? 'none' : '';
-    };
-
-    typeSelect.addEventListener('change', updateFormLayout);
-    updateFormLayout();
-}
-
-window.addAperture = function() {
-    const typeSelect = document.getElementById('aperture-type');
-    if (!typeSelect) return;
-    
-    const type = typeSelect.value;
-    const wallId = document.getElementById('aperture-wall').value;
-    const width = parseFloat(document.getElementById('aperture-width').value);
-    const height = parseFloat(document.getElementById('aperture-height').value);
-    const x = parseFloat(document.getElementById('aperture-x').value);
-    
-    let y = (type === 'door') ? height / 2 : parseFloat(document.getElementById('aperture-y').value);
-
-    const candidate = {
-        id: Date.now(),
-        type: type,
-        wallId: wallId,
-        w: width,
-        h: height,
-        x: x,
-        y: y
-    };
-
-    if (!isValidAperture(candidate)) {
-        alert("Placement Error: Aperture is out of bounds or overlapping.");
-        return;
-    }
-
-    apertures.push(candidate);
-    updateApertureList();
-    updateBuilding();
-};
-
-window.removeAperture = function(id) {
-    apertures = apertures.filter(a => a.id !== id);
-    updateApertureList();
-    updateBuilding();
-};
-
-function updateApertureList() {
-    const list = document.getElementById('aperture-list');
-    if (!list) return;
-    
-    list.innerHTML = apertures.map(a => `
-        <div class="aperture-item">
-            <span>${a.type === 'window' ? '🪟' : '🚪'} on ${a.wallId}</span>
-            <button onclick="removeAperture(${a.id})">×</button>
-        </div>
-    `).join('');
-}
-
 function createWallShapeWithHoles(wallId, baseShape) {
     const wallApertures = apertures.filter(a => a.wallId === wallId);
-    
     wallApertures.forEach(aperture => {
         const hole = new THREE.Path();
-        const hw = aperture.w / 2;
-        const hh = aperture.h / 2;
-        
+        const hw = aperture.w / 2, hh = aperture.h / 2;
         hole.moveTo(aperture.x - hw, aperture.y - hh);
         hole.lineTo(aperture.x + hw, aperture.y - hh);
         hole.lineTo(aperture.x + hw, aperture.y + hh);
         hole.lineTo(aperture.x - hw, aperture.y + hh);
         hole.lineTo(aperture.x - hw, aperture.y - hh);
-        
         baseShape.holes.push(hole);
     });
-    
     return baseShape;
 }
 
 function buildApertureComponents(wallId, wallMesh, buildingGroup) {
     const wallApertures = apertures.filter(a => a.wallId === wallId);
-    
     wallApertures.forEach(aperture => {
         const group = new THREE.Group();
         group.userData.apertureId = aperture.id;
         group.userData.wallId = wallId;
         
         const isSelected = selectedApertureData && selectedApertureData.id === aperture.id;
-        const frameColor = isSelected ? 0xffff00 : 0x2c2c2c;
-
+        const frameColor = isSelected ? 0x007bff : 0x2c2c2c;
         const frameMaterial = new THREE.MeshLambertMaterial({ color: frameColor });
-        const glassMaterial = new THREE.MeshLambertMaterial({ 
-            color: isSelected ? 0xffffbb : 0x88ccff, 
-            transparent: true, 
-            opacity: 0.4 
-        });
-        const doorMaterial = new THREE.MeshLambertMaterial({ color: isSelected ? 0xd4a373 : 0x8b4513 });
+        const glassMaterial = new THREE.MeshLambertMaterial({ color: isSelected ? 0xcce5ff : 0x88ccff, transparent: true, opacity: 0.5 });
+        const doorMaterial = new THREE.MeshLambertMaterial({ color: isSelected ? 0x007bff : 0x495057 });
         
         const frameDepth = wallThickness + 0.01; 
         const frameThickness = 0.05;
         
         if (aperture.type === 'window') {
-            const topFrame = new THREE.BoxGeometry(aperture.w, frameThickness, frameDepth);
-            const bottomFrame = new THREE.BoxGeometry(aperture.w, frameThickness, frameDepth);
-            const leftFrame = new THREE.BoxGeometry(frameThickness, aperture.h - (frameThickness * 2), frameDepth);
-            const rightFrame = new THREE.BoxGeometry(frameThickness, aperture.h - (frameThickness * 2), frameDepth);
+            const topFrame = new THREE.Mesh(new THREE.BoxGeometry(aperture.w, frameThickness, frameDepth), frameMaterial);
+            topFrame.position.set(0, (aperture.h / 2) - (frameThickness / 2), 0); group.add(topFrame);
             
-            const top = new THREE.Mesh(topFrame, frameMaterial);
-            top.position.set(0, (aperture.h / 2) - (frameThickness / 2), 0);
-            group.add(top);
+            const bottomFrame = new THREE.Mesh(new THREE.BoxGeometry(aperture.w, frameThickness, frameDepth), frameMaterial);
+            bottomFrame.position.set(0, (-aperture.h / 2) + (frameThickness / 2), 0); group.add(bottomFrame);
             
-            const bottom = new THREE.Mesh(bottomFrame, frameMaterial);
-            bottom.position.set(0, (-aperture.h / 2) + (frameThickness / 2), 0);
-            group.add(bottom);
+            const leftFrame = new THREE.Mesh(new THREE.BoxGeometry(frameThickness, aperture.h - (frameThickness * 2), frameDepth), frameMaterial);
+            leftFrame.position.set((-aperture.w / 2) + (frameThickness / 2), 0, 0); group.add(leftFrame);
             
-            const left = new THREE.Mesh(leftFrame, frameMaterial);
-            left.position.set((-aperture.w / 2) + (frameThickness / 2), 0, 0);
-            group.add(left);
+            const rightFrame = new THREE.Mesh(new THREE.BoxGeometry(frameThickness, aperture.h - (frameThickness * 2), frameDepth), frameMaterial);
+            rightFrame.position.set((aperture.w / 2) - (frameThickness / 2), 0, 0); group.add(rightFrame);
             
-            const right = new THREE.Mesh(rightFrame, frameMaterial);
-            right.position.set((aperture.w / 2) - (frameThickness / 2), 0, 0);
-            group.add(right);
-            
-            const glassGeo = new THREE.BoxGeometry(
-                aperture.w - frameThickness * 2, 
-                aperture.h - frameThickness * 2, 
-                frameDepth * 0.3
-            );
-            const glass = new THREE.Mesh(glassGeo, glassMaterial);
-            glass.position.set(0, 0, 0);
+            const glass = new THREE.Mesh(new THREE.BoxGeometry(aperture.w - frameThickness * 2, aperture.h - frameThickness * 2, frameDepth * 0.3), glassMaterial);
             group.add(glass);
-            
         } else if (aperture.type === 'door') {
-            const doorGeo = new THREE.BoxGeometry(aperture.w - (frameThickness * 2), aperture.h - frameThickness, frameDepth * 0.7);
-            const door = new THREE.Mesh(doorGeo, doorMaterial);
-            door.position.set(0, -frameThickness / 2, 0);
-            group.add(door);
+            const door = new THREE.Mesh(new THREE.BoxGeometry(aperture.w - (frameThickness * 2), aperture.h - frameThickness, frameDepth * 0.7), doorMaterial);
+            door.position.set(0, -frameThickness / 2, 0); group.add(door);
             
-            const topFrame = new THREE.BoxGeometry(aperture.w, frameThickness, frameDepth);
-            const top = new THREE.Mesh(topFrame, frameMaterial);
-            top.position.set(0, (aperture.h / 2) - (frameThickness / 2), 0);
-            group.add(top);
+            const topFrame = new THREE.Mesh(new THREE.BoxGeometry(aperture.w, frameThickness, frameDepth), frameMaterial);
+            topFrame.position.set(0, (aperture.h / 2) - (frameThickness / 2), 0); group.add(topFrame);
             
-            const leftFrame = new THREE.BoxGeometry(frameThickness, aperture.h - frameThickness, frameDepth);
-            const left = new THREE.Mesh(leftFrame, frameMaterial);
-            left.position.set((-aperture.w / 2) + (frameThickness / 2), -frameThickness / 2, 0);
-            group.add(left);
+            const leftFrame = new THREE.Mesh(new THREE.BoxGeometry(frameThickness, aperture.h - frameThickness, frameDepth), frameMaterial);
+            leftFrame.position.set((-aperture.w / 2) + (frameThickness / 2), -frameThickness / 2, 0); group.add(leftFrame);
             
-            const rightFrame = new THREE.BoxGeometry(frameThickness, aperture.h - frameThickness, frameDepth);
-            const right = new THREE.Mesh(rightFrame, frameMaterial);
-            right.position.set((aperture.w / 2) - (frameThickness / 2), -frameThickness / 2, 0);
-            group.add(right);
+            const rightFrame = new THREE.Mesh(new THREE.BoxGeometry(frameThickness, aperture.h - frameThickness, frameDepth), frameMaterial);
+            rightFrame.position.set((aperture.w / 2) - (frameThickness / 2), -frameThickness / 2, 0); group.add(rightFrame);
         }
         
         group.position.copy(wallMesh.position);
         group.rotation.copy(wallMesh.rotation);
-        
         group.translateX(aperture.x);
         group.translateY(aperture.y);
         group.translateZ(wallThickness / 2);
         
-        if (!apertureComponents[wallId]) {
-            apertureComponents[wallId] = [];
-        }
+        if (!apertureComponents[wallId]) apertureComponents[wallId] = [];
         apertureComponents[wallId].push(group);
-        
         buildingGroup.add(group);
     });
 }
 
 function createSideWallGeometry(widthAlongZ, baseH, roofType, wallId = null) {
     const shape = new THREE.Shape();
-    shape.moveTo(-widthAlongZ / 2, 0);
-    shape.lineTo(widthAlongZ / 2, 0);
-
+    shape.moveTo(-widthAlongZ / 2, 0); shape.lineTo(widthAlongZ / 2, 0);
     if (roofType === "apex") {
-        shape.lineTo(widthAlongZ / 2, baseH);
-        shape.lineTo(0, baseH + peakHeight);
-        shape.lineTo(-widthAlongZ / 2, baseH);
+        shape.lineTo(widthAlongZ / 2, baseH); shape.lineTo(0, baseH + peakHeight); shape.lineTo(-widthAlongZ / 2, baseH);
     } else if (roofType === "pent") {
-        shape.lineTo(widthAlongZ / 2, baseH + slopeHeight);
-        shape.lineTo(-widthAlongZ / 2, baseH);
+        shape.lineTo(widthAlongZ / 2, baseH + slopeHeight); shape.lineTo(-widthAlongZ / 2, baseH);
     } else {
-        shape.lineTo(widthAlongZ / 2, baseH);
-        shape.lineTo(-widthAlongZ / 2, baseH);
+        shape.lineTo(widthAlongZ / 2, baseH); shape.lineTo(-widthAlongZ / 2, baseH);
     }
     shape.closePath();
-
     if (wallId) createWallShapeWithHoles(wallId, shape);
-
-    return new THREE.ExtrudeGeometry(shape, {
-        steps: 1, depth: wallThickness, bevelEnabled: false,
-    });
+    return new THREE.ExtrudeGeometry(shape, { steps: 1, depth: wallThickness, bevelEnabled: false });
 }
 
 function createRectWallGeometry(widthAlongX, heightY, wallId = null) {
     const shape = new THREE.Shape();
-    shape.moveTo(-widthAlongX / 2, 0);
-    shape.lineTo(widthAlongX / 2, 0);
-    shape.lineTo(widthAlongX / 2, heightY);
-    shape.lineTo(-widthAlongX / 2, heightY);
-    shape.closePath();
-
+    shape.moveTo(-widthAlongX / 2, 0); shape.lineTo(widthAlongX / 2, 0);
+    shape.lineTo(widthAlongX / 2, heightY); shape.lineTo(-widthAlongX / 2, heightY); shape.closePath();
     if (wallId) createWallShapeWithHoles(wallId, shape);
-
-    return new THREE.ExtrudeGeometry(shape, {
-        steps: 1, depth: wallThickness, bevelEnabled: false,
-    });
+    return new THREE.ExtrudeGeometry(shape, { steps: 1, depth: wallThickness, bevelEnabled: false });
 }
 
 function createPanelGeo(width, hLeft, hRight, wallId = null) {
     const shape = new THREE.Shape();
-    shape.moveTo(-width / 2, 0);
-    shape.lineTo(width / 2, 0);
-    shape.lineTo(width / 2, hRight);
-    shape.lineTo(-width / 2, hLeft);
-    shape.closePath();
-
+    shape.moveTo(-width / 2, 0); shape.lineTo(width / 2, 0);
+    shape.lineTo(width / 2, hRight); shape.lineTo(-width / 2, hLeft); shape.closePath();
     if (wallId) createWallShapeWithHoles(wallId, shape);
-
-    return new THREE.ExtrudeGeometry(shape, {
-        steps: 1, depth: wallThickness, bevelEnabled: false,
-    });
+    return new THREE.ExtrudeGeometry(shape, { steps: 1, depth: wallThickness, bevelEnabled: false });
 }
 
 function createRoof(roofType, shape, buildingGroup, roofMaterial, isLShape = false, centerX = 0, centerZ = 0) {
@@ -648,16 +610,12 @@ function createRoof(roofType, shape, buildingGroup, roofMaterial, isLShape = fal
         roofGeo.rotateX(-Math.PI / 2);
         const roof = new THREE.Mesh(roofGeo, roofMaterial);
         const angle = -Math.atan2(slopeHeight, D);
-        
         if (isLShape) {
             roof.position.set(-centerX, H - 0.01, -centerZ);
-            roof.geometry.translate(0, 0, -D / 2);
-            roof.rotation.x = angle;
-            roof.geometry.translate(0, 0, D / 2);
+            roof.geometry.translate(0, 0, -D / 2); roof.rotation.x = angle; roof.geometry.translate(0, 0, D / 2);
             roof.position.y += slopeHeight / 2 + roofGap;
         } else {
-            roof.rotation.x = angle;
-            roof.position.y = H + slopeHeight / 2 + roofGap;
+            roof.rotation.x = angle; roof.position.y = H + slopeHeight / 2 + roofGap;
         }
         buildingGroup.add(roof);
     } else if (roofType === "apex" && !isLShape) {
@@ -665,16 +623,12 @@ function createRoof(roofType, shape, buildingGroup, roofMaterial, isLShape = fal
         const roofHalfWidth = D / 2 / Math.cos(angle) + roofOverhang;
         const roofPlateGeo = new THREE.BoxGeometry(W + roofOverhang * 2, roofThickness, roofHalfWidth);
         const zOffset = D / 4 + roofOverhang / 2;
-
         const roofL = new THREE.Mesh(roofPlateGeo, roofMaterial);
         roofL.position.set(0, H + peakHeight / 2 + roofThickness / 2 + roofGap, zOffset);
-        roofL.rotation.x = angle;
-        buildingGroup.add(roofL);
-
+        roofL.rotation.x = angle; buildingGroup.add(roofL);
         const roofR = new THREE.Mesh(roofPlateGeo, roofMaterial);
         roofR.position.set(0, H + peakHeight / 2 + roofThickness / 2 + roofGap, -zOffset);
-        roofR.rotation.x = -angle;
-        buildingGroup.add(roofR);
+        roofR.rotation.x = -angle; buildingGroup.add(roofR);
     } else {
         const roofGeo = new THREE.ExtrudeGeometry(shape, { steps: 1, depth: roofThickness, bevelEnabled: false });
         roofGeo.rotateX(-Math.PI / 2);
@@ -729,47 +683,36 @@ function updateBuilding() {
             backGeo = createRectWallGeometry(frontW, H, "back");
         }
 
-        walls.left = addMeshWithEdges(leftGeo, wallMaterial, edgeMaterial, buildingGroup);
-        walls.left.rotation.y = -Math.PI / 2;
-        walls.left.position.set(-W / 2 + t, 0, 0);
+        walls.left = addMeshWithEdges(leftGeo, wallMaterial, edgeMaterial, buildingGroup, "left");
+        walls.left.rotation.y = -Math.PI / 2; walls.left.position.set(-W / 2 + t, 0, 0);
         buildApertureComponents("left", walls.left, buildingGroup);
 
-        walls.right = addMeshWithEdges(rightGeo, wallMaterial, edgeMaterial, buildingGroup);
-        walls.right.rotation.y = -Math.PI / 2;
-        walls.right.position.set(W / 2, 0, 0);
+        walls.right = addMeshWithEdges(rightGeo, wallMaterial, edgeMaterial, buildingGroup, "right");
+        walls.right.rotation.y = -Math.PI / 2; walls.right.position.set(W / 2, 0, 0);
         buildApertureComponents("right", walls.right, buildingGroup);
 
-        walls.front = addMeshWithEdges(frontGeo, wallMaterial, edgeMaterial, buildingGroup);
+        walls.front = addMeshWithEdges(frontGeo, wallMaterial, edgeMaterial, buildingGroup, "front");
         walls.front.position.set(0, 0, D / 2 - t);
         buildApertureComponents("front", walls.front, buildingGroup);
 
-        walls.back = addMeshWithEdges(backGeo, wallMaterial, edgeMaterial, buildingGroup);
+        walls.back = addMeshWithEdges(backGeo, wallMaterial, edgeMaterial, buildingGroup, "back");
         walls.back.position.set(0, 0, -D / 2);
         buildApertureComponents("back", walls.back, buildingGroup);
 
         const floorGeo = new THREE.PlaneGeometry(W, D);
         floorGeo.rotateX(-Math.PI / 2);
         const floor = new THREE.Mesh(floorGeo, floorMaterial);
-        floor.position.y = 0.01;
-        buildingGroup.add(floor);
+        floor.position.y = 0.01; buildingGroup.add(floor);
 
         if (showRoof) {
-            const roofShape = new THREE.Shape();
-            const o = roofOverhang;
-            roofShape.moveTo(-W / 2 - o, -D / 2 - o);
-            roofShape.lineTo(W / 2 + o, -D / 2 - o);
-            roofShape.lineTo(W / 2 + o, D / 2 + o);
-            roofShape.lineTo(-W / 2 - o, D / 2 + o);
-            roofShape.closePath();
+            const roofShape = new THREE.Shape(); const o = roofOverhang;
+            roofShape.moveTo(-W / 2 - o, -D / 2 - o); roofShape.lineTo(W / 2 + o, -D / 2 - o);
+            roofShape.lineTo(W / 2 + o, D / 2 + o); roofShape.lineTo(-W / 2 - o, D / 2 + o); roofShape.closePath();
             createRoof(currentRoofType, roofShape, buildingGroup, roofMaterial, false);
         }
     } else {
         const effectiveRoofType = currentRoofType === "apex" ? "pent" : currentRoofType;
-
-        const getZHeight = (z) => {
-            if (effectiveRoofType !== "pent") return H;
-            return H + slopeHeight * ((z + D / 2) / D);
-        };
+        const getZHeight = (z) => { if (effectiveRoofType !== "pent") return H; return H + slopeHeight * ((z + D / 2) / D); };
 
         const leftGeo = createPanelGeo(D, getZHeight(-D / 2), getZHeight(D / 2), "left");
         const frontGeo = createPanelGeo(W - 2 * t, getZHeight(D / 2 - t), getZHeight(D / 2 - t), "front");
@@ -778,77 +721,56 @@ function updateBuilding() {
         const innerLeftGeo = createPanelGeo(D / 2 + t, getZHeight(-D / 2), getZHeight(0), "innerLeft");
         const backGeo = createPanelGeo(W / 2 - 2 * t, getZHeight(-D / 2), getZHeight(-D / 2), "back");
 
-        walls.left = addMeshWithEdges(leftGeo, wallMaterial, edgeMaterial, buildingGroup);
-        walls.left.rotation.y = -Math.PI / 2;
-        walls.left.position.set(-W / 2 + t, 0, 0);
+        walls.left = addMeshWithEdges(leftGeo, wallMaterial, edgeMaterial, buildingGroup, "left");
+        walls.left.rotation.y = -Math.PI / 2; walls.left.position.set(-W / 2 + t, 0, 0);
         buildApertureComponents("left", walls.left, buildingGroup);
 
-        walls.front = addMeshWithEdges(frontGeo, wallMaterial, edgeMaterial, buildingGroup);
+        walls.front = addMeshWithEdges(frontGeo, wallMaterial, edgeMaterial, buildingGroup, "front");
         walls.front.position.set(0, 0, D / 2 - t);
         buildApertureComponents("front", walls.front, buildingGroup);
 
-        walls.right = addMeshWithEdges(rightGeo, wallMaterial, edgeMaterial, buildingGroup);
-        walls.right.rotation.y = -Math.PI / 2;
-        walls.right.position.set(W / 2, 0, D / 4);
+        walls.right = addMeshWithEdges(rightGeo, wallMaterial, edgeMaterial, buildingGroup, "right");
+        walls.right.rotation.y = -Math.PI / 2; walls.right.position.set(W / 2, 0, D / 4);
         buildApertureComponents("right", walls.right, buildingGroup);
 
-        walls.innerBack = addMeshWithEdges(innerBackGeo, wallMaterial, edgeMaterial, buildingGroup);
+        walls.innerBack = addMeshWithEdges(innerBackGeo, wallMaterial, edgeMaterial, buildingGroup, "innerBack");
         walls.innerBack.position.set(W / 4 - t / 2, 0, 0);
         buildApertureComponents("innerBack", walls.innerBack, buildingGroup);
 
-        walls.innerLeft = addMeshWithEdges(innerLeftGeo, wallMaterial, edgeMaterial, buildingGroup);
-        walls.innerLeft.rotation.y = -Math.PI / 2;
-        walls.innerLeft.position.set(0, 0, -D / 4 + t / 2);
+        walls.innerLeft = addMeshWithEdges(innerLeftGeo, wallMaterial, edgeMaterial, buildingGroup, "innerLeft");
+        walls.innerLeft.rotation.y = -Math.PI / 2; walls.innerLeft.position.set(0, 0, -D / 4 + t / 2);
         buildApertureComponents("innerLeft", walls.innerLeft, buildingGroup);
 
-        walls.back = addMeshWithEdges(backGeo, wallMaterial, edgeMaterial, buildingGroup);
+        walls.back = addMeshWithEdges(backGeo, wallMaterial, edgeMaterial, buildingGroup, "back");
         walls.back.position.set(-W / 4, 0, -D / 2);
         buildApertureComponents("back", walls.back, buildingGroup);
 
         const floorShape = new THREE.Shape();
-        floorShape.moveTo(-W / 2, D / 2);
-        floorShape.lineTo(0, D / 2);
-        floorShape.lineTo(0, 0);
-        floorShape.lineTo(W / 2, 0);
-        floorShape.lineTo(W / 2, -D / 2);
-        floorShape.lineTo(-W / 2, -D / 2);
-        floorShape.closePath();
-
-        const floorGeo = new THREE.ShapeGeometry(floorShape);
-        floorGeo.rotateX(-Math.PI / 2);
-        const floor = new THREE.Mesh(floorGeo, floorMaterial);
-        floor.position.y = 0.01;
-        buildingGroup.add(floor);
+        floorShape.moveTo(-W / 2, D / 2); floorShape.lineTo(0, D / 2); floorShape.lineTo(0, 0);
+        floorShape.lineTo(W / 2, 0); floorShape.lineTo(W / 2, -D / 2); floorShape.lineTo(-W / 2, -D / 2); floorShape.closePath();
+        const floorGeo = new THREE.ShapeGeometry(floorShape); floorGeo.rotateX(-Math.PI / 2);
+        const floor = new THREE.Mesh(floorGeo, floorMaterial); floor.position.y = 0.01; buildingGroup.add(floor);
 
         if (showRoof) {
-            const roofShape = new THREE.Shape();
-            const o = roofOverhang;
-            roofShape.moveTo(-W / 2 - o, D / 2 + o);
-            roofShape.lineTo(o, D / 2 + o);
-            roofShape.lineTo(o, o);
-            roofShape.lineTo(W / 2 + o, o);
-            roofShape.lineTo(W / 2 + o, -D / 2 - o);
-            roofShape.lineTo(-W / 2 - o, -D / 2 - o);
-            roofShape.closePath();
+            const roofShape = new THREE.Shape(); const o = roofOverhang;
+            roofShape.moveTo(-W / 2 - o, D / 2 + o); roofShape.lineTo(o, D / 2 + o); roofShape.lineTo(o, o);
+            roofShape.lineTo(W / 2 + o, o); roofShape.lineTo(W / 2 + o, -D / 2 - o); roofShape.lineTo(-W / 2 - o, -D / 2 - o); roofShape.closePath();
             createRoof(effectiveRoofType, roofShape, buildingGroup, roofMaterial, true, 0, 0);
         }
     }
 
     applyWallVisibility();
-
     building = buildingGroup;
     scene.add(building);
 }
 
-function addMeshWithEdges(geo, mat, edgeMat, group) {
+function addMeshWithEdges(geo, mat, edgeMat, group, wallId) {
     const mesh = new THREE.Mesh(geo, mat);
     const edges = new THREE.EdgesGeometry(geo);
     const line = new THREE.LineSegments(edges, edgeMat);
-    
-    mesh.userData.edgeLine = line;
+    mesh.userData = { edgeLine: line, wallId: wallId }; // Store wallId for raycast dragging
     mesh.add(line);
     group.add(mesh);
-    
     return mesh;
 }
 
@@ -857,24 +779,19 @@ function applyWallVisibility() {
         if (walls[wallName]) {
             const visible = wallVisibility[wallName];
             walls[wallName].visible = visible;
-            if (walls[wallName].userData.edgeLine) {
-                walls[wallName].userData.edgeLine.visible = visible;
-            }
-            if (apertureComponents[wallName]) {
-                apertureComponents[wallName].forEach(comp => comp.visible = visible);
-            }
+            if (walls[wallName].userData.edgeLine) walls[wallName].userData.edgeLine.visible = visible;
+            if (apertureComponents[wallName]) apertureComponents[wallName].forEach(comp => comp.visible = visible);
         }
     });
 }
 
-window.toggleWall = function(wallName, e) {
+// GLOBALS & INITIALIZATION
+
+window.toggleWall = function (wallName, e) {
     const evt = e || window.event;
     wallVisibility[wallName] = !wallVisibility[wallName];
     applyWallVisibility();
-    
-    if (evt && evt.currentTarget) {
-        evt.currentTarget.classList.toggle('active');
-    }
+    if (evt && evt.currentTarget) evt.currentTarget.classList.toggle('active');
 };
 
 function fitCamera() {
@@ -910,7 +827,8 @@ window.updateDim = function (prop, val) {
 window.setRoof = function (type, e) {
     const evt = e || window.event;
     currentRoofType = type;
-    document.querySelectorAll("#roof-options .style-option").forEach((o) => o.classList.remove("active"));
+    resetApertures();
+    document.querySelectorAll("#roof-options .style-option").forEach(o => o.classList.remove("active"));
     if (evt && evt.currentTarget) evt.currentTarget.classList.add("active");
     updateBuilding();
 };
@@ -918,12 +836,9 @@ window.setRoof = function (type, e) {
 window.setShape = function (type, e) {
     const evt = e || window.event;
     currentShapeType = type;
-
     resetApertures();
-    
-    document.querySelectorAll(".sidebar-nav .nav-section:first-child .style-option").forEach((o) => o.classList.remove("active"));
+    document.querySelectorAll(".sidebar-nav .nav-section:first-child .style-option").forEach(o => o.classList.remove("active"));
     if (evt && evt.currentTarget) evt.currentTarget.classList.add("active");
-    
     updateRoofOptionsVisibility();
     updateBuilding();
     fitCamera();
@@ -936,13 +851,11 @@ window.updateRoofOptionsVisibility = function () {
             apexOption.style.display = "none";
             if (currentRoofType === "apex") {
                 currentRoofType = "pent";
-                document.querySelectorAll("#roof-options .style-option").forEach((o) => o.classList.remove("active"));
+                document.querySelectorAll("#roof-options .style-option").forEach(o => o.classList.remove("active"));
                 const pentOption = document.querySelector('#roof-options .style-option[onclick*="pent"]');
                 if (pentOption) pentOption.classList.add("active");
             }
-        } else {
-            apexOption.style.display = "";
-        }
+        } else apexOption.style.display = "";
     }
 };
 
@@ -956,7 +869,7 @@ window.toggleSidebar = function () {
 window.toggleSection = function (header) {
     const section = header.parentElement;
     const wasActive = section.classList.contains("active");
-    document.querySelectorAll(".nav-section").forEach((s) => s.classList.remove("active"));
+    document.querySelectorAll(".nav-section").forEach(s => s.classList.remove("active"));
     if (!wasActive) section.classList.add("active");
 };
 
@@ -965,54 +878,23 @@ window.toggleFreeRoam = function () {
     const btn = document.getElementById("roam-toggle");
     if(btn) {
         btn.innerHTML = isFreeRoam ? "🔓" : "🔒";
-        btn.style.background = isFreeRoam ? "#007bff" : "white";
-        btn.style.color = isFreeRoam ? "white" : "black";
+        btn.style.background = isFreeRoam ? "var(--accent-color)" : "rgba(255, 255, 255, 0.9)";
+        btn.style.color = isFreeRoam ? "white" : "var(--text-dark)";
     }
 };
 
 window.rotateTo = function (view, e) {
     const evt = e || window.event;
-    document.querySelectorAll(".view-controls button").forEach((btn) => btn.classList.remove("active"));
-    
+    document.querySelectorAll(".view-controls button").forEach(btn => btn.classList.remove("active"));
     if (evt && evt.currentTarget && evt.currentTarget.id !== "roam-toggle" && evt.currentTarget.id !== "roof-toggle") {
         evt.currentTarget.classList.add("active");
     }
-    
     const views = {
-        front: [0, 0],
-        right: [Math.PI / 2, 0],
-        back: [Math.PI, 0],
-        left: [-Math.PI / 2, 0],
-        top: [0, 1.5],
-        iso: [-Math.PI / 4, 0.25],
+        front: [0, 0], right: [Math.PI / 2, 0], back: [Math.PI, 0],
+        left: [-Math.PI / 2, 0], top: [0, 1.5], iso: [-Math.PI / 4, 0.25],
     };
     if (views[view]) [targetAngle, targetVerticalAngle] = views[view];
 };
-
-function setupInputs(container) {
-    const start = (x, y) => {
-        if (isFreeRoam) {
-            isDragging = true;
-            previousX = x;
-            previousY = y;
-        }
-    };
-    const move = (x, y) => {
-        if (!isDragging || !isFreeRoam) return;
-        targetAngle += (x - previousX) * 0.005;
-        targetVerticalAngle += (y - previousY) * 0.005;
-        targetVerticalAngle = Math.max(-1.4, Math.min(1.4, targetVerticalAngle));
-        previousX = x;
-        previousY = y;
-    };
-    container.addEventListener("mousedown", (e) => start(e.clientX, e.clientY));
-    window.addEventListener("mousemove", (e) => move(e.clientX, e.clientY));
-    window.addEventListener("mouseup", () => (isDragging = false));
-    container.addEventListener("wheel", (e) => {
-            e.preventDefault();
-            targetRadius = Math.max(5, Math.min(25, targetRadius + (e.deltaY > 0 ? 0.5 : -0.5)));
-        }, { passive: false });
-}
 
 function animate() {
     requestAnimationFrame(animate);
@@ -1028,7 +910,6 @@ function animate() {
     camera.lookAt(0, H / 2, 0);
     
     updateTransformHUDPosition();
-    
     renderer.render(scene, camera);
 }
 
@@ -1039,5 +920,38 @@ window.addEventListener("resize", () => {
     camera.updateProjectionMatrix();
     renderer.setSize(container.clientWidth, container.clientHeight);
 });
+
+function init() {
+    const container = document.getElementById("builder-viewport");
+    if (!container) return;
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xf4f4f4);
+
+    camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    container.appendChild(renderer.domElement);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+    const light = new THREE.DirectionalLight(0xffffff, 0.6);
+    light.position.set(5, 10, 7);
+    scene.add(light);
+
+    const grid = new THREE.GridHelper(20, 20, 0xdddddd, 0xeeeeee);
+    scene.add(grid);
+
+    setupCanvasInteraction(container);
+    updateQuickStats(); 
+    updateBuilding();
+    fitCamera();
+    
+    // Desktop wheel zoom
+    container.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        targetRadius = Math.max(5, Math.min(25, targetRadius + (e.deltaY > 0 ? 0.5 : -0.5)));
+    }, { passive: false });
+
+    animate();
+}
 
 init();
