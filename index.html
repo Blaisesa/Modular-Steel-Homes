@@ -42,6 +42,31 @@
 
                 <div class="nav-section">
                     <div class="nav-header" onclick="toggleSection(this)">
+                        <span>Exterior Finish</span>
+                        <span class="chevron">▼</span>
+                    </div>
+                    <div class="nav-content" id="exterior-options">
+                        <div class="style-option active" onclick="setExterior('default')">
+                            <div class="style-color" style="background: #333333;"></div>
+                            <span>Modern Charcoal</span>
+                        </div>
+                        <div class="style-option" onclick="setExterior('timber')">
+                            <div class="style-color" style="background: #8b4513;"></div>
+                            <span>Natural Cedar</span>
+                        </div>
+                        <div class="style-option" onclick="setExterior('brick')">
+                            <div class="style-color" style="background: #a52a2a;"></div>
+                            <span>Red Brick</span>
+                        </div>
+                        <div class="style-option" onclick="setExterior('metal')">
+                            <div class="style-color" style="background: #708090;"></div>
+                            <span>Industrial Steel</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-header" onclick="toggleSection(this)">
                         <span>Roof Style</span>
                         <span class="chevron">▼</span>
                     </div>
@@ -187,14 +212,9 @@
 
     <div class="quick-stats">
         <div class="stat-item">
-            <span class="stat-icon">🪟</span>
-            <span class="stat-label">Windows:</span>
-            <span class="stat-value" id="stat-windows">0</span>
-        </div>
-        <div class="stat-item">
-            <span class="stat-icon">🚪</span>
-            <span class="stat-label">Doors:</span>
-            <span class="stat-value" id="stat-doors">0</span>
+            <span class="stat-icon">📐</span>
+            <span class="stat-label">Floor Area:</span>
+            <span class="stat-value" id="stat-area">24.0 m²</span>
         </div>
     </div>
 

@@ -10,8 +10,16 @@ let W = 6, H = 2.8, D = 4;
 let currentShapeType = "rectangle";
 let currentRoofType = "pent";
 let showRoof = true;
+let currentExteriorTexture = "default";
+
+const TEXTURES = {
+    default: { color: 0x303030, name: "Modern Charcoal" },
+    timber: { color: 0x8b4513, name: "Natural Cedar" },
+    brick: { color: 0xa52a2a, name: "Red Brick" },
+    metal: { color: 0x708090, name: "Industrial Steel" }
+};
 const roofOverhang = 0.2, slopeHeight = 0.45, peakHeight = 0.8;
-const wallThickness = 0.15, roofThickness = 0.17, roofGap = 0.01;
+const wallThickness = 0.15, roofThickness = 0.15, roofGap = 0.02;
 
 let walls = { front: null, back: null, left: null, right: null, innerBack: null, innerLeft: null };
 let wallVisibility = { front: true, back: true, left: true, right: true, innerBack: true, innerLeft: true };
@@ -56,6 +64,7 @@ window.toggleLibraryCategory = function(header) {
     const category = header.parentElement;
     if (category) category.classList.toggle('expanded');
 };
+
 
 // NEW DRAG & DROP PLACEMENT LOGIC
 
@@ -321,12 +330,13 @@ function showTransformHUD(data) {
     }
     
     hud.innerHTML = `
-        <button class="hud-pill-btn" onclick="startMove()" title="Move">↔️</button>
-        <button class="hud-pill-btn" onclick="startResize('width')" title="Resize Width">📏</button>
-        <button class="hud-pill-btn" onclick="startResize('height')" title="Resize Height">📐</button>
+        <div class="hud-label">${data.type.toUpperCase()}</div>
+        <button class="hud-pill-btn" onclick="startMove()" title="Move">Move</button>
+        <button class="hud-pill-btn" onclick="startResize('width')" title="Resize Width">Width</button>
+        <button class="hud-pill-btn" onclick="startResize('height')" title="Resize Height">Height</button>
         <div class="hud-pill-divider"></div>
-        <button class="hud-pill-btn danger" onclick="deleteSelectedAperture()" title="Delete">🗑️</button>
-        <button class="hud-pill-btn" onclick="deselectAperture()" title="Close">✖️</button>
+        <button class="hud-pill-btn danger" onclick="deleteSelectedAperture()" title="Delete">Delete</button>
+        <button class="hud-pill-btn close" onclick="deselectAperture()" title="Close">✕</button>
     `;
     hud.style.display = 'flex';
 }
@@ -447,11 +457,6 @@ function updateQuickStats() {
     const area = currentShapeType === "rectangle" ? (W * D) : (W * D * 0.75);
     const areaLabel = document.getElementById('stat-area');
     if (areaLabel) areaLabel.innerText = area.toFixed(1) + ' m²';
-
-    const windows = apertures.filter(a => a.type === 'window').length;
-    const doors = apertures.filter(a => a.type === 'door').length;
-    const countLabel = document.getElementById('stat-apertures');
-    if (countLabel) countLabel.innerText = `${windows}W / ${doors}D`;
 }
 
 function isValidAperture(candidate) {
@@ -548,8 +553,21 @@ function buildApertureComponents(wallId, wallMesh, buildingGroup) {
             const glass = new THREE.Mesh(new THREE.BoxGeometry(aperture.w - frameThickness * 2, aperture.h - frameThickness * 2, frameDepth * 0.3), glassMaterial);
             group.add(glass);
         } else if (aperture.type === 'door') {
-            const door = new THREE.Mesh(new THREE.BoxGeometry(aperture.w - (frameThickness * 2), aperture.h - frameThickness, frameDepth * 0.7), doorMaterial);
-            door.position.set(0, -frameThickness / 2, 0); group.add(door);
+            const isDouble = aperture.w > 1.5; // Logic for double door
+            if (isDouble) {
+                const leafW = (aperture.w - (frameThickness * 3)) / 2;
+                const doorL = new THREE.Mesh(new THREE.BoxGeometry(leafW, aperture.h - frameThickness, frameDepth * 0.7), doorMaterial);
+                doorL.position.set(-leafW / 2 - frameThickness / 4, -frameThickness / 2, 0); group.add(doorL);
+                
+                const doorR = new THREE.Mesh(new THREE.BoxGeometry(leafW, aperture.h - frameThickness, frameDepth * 0.7), doorMaterial);
+                doorR.position.set(leafW / 2 + frameThickness / 4, -frameThickness / 2, 0); group.add(doorR);
+
+                const midFrame = new THREE.Mesh(new THREE.BoxGeometry(frameThickness / 2, aperture.h - frameThickness, frameDepth), frameMaterial);
+                midFrame.position.set(0, -frameThickness / 2, 0); group.add(midFrame);
+            } else {
+                const door = new THREE.Mesh(new THREE.BoxGeometry(aperture.w - (frameThickness * 2), aperture.h - frameThickness, frameDepth * 0.7), doorMaterial);
+                door.position.set(0, -frameThickness / 2, 0); group.add(door);
+            }
             
             const topFrame = new THREE.Mesh(new THREE.BoxGeometry(aperture.w, frameThickness, frameDepth), frameMaterial);
             topFrame.position.set(0, (aperture.h / 2) - (frameThickness / 2), 0); group.add(topFrame);
@@ -655,10 +673,11 @@ function updateBuilding() {
     apertureComponents = {};
 
     const buildingGroup = new THREE.Group();
-    const wallMaterial = new THREE.MeshLambertMaterial({ color: 0x707173, side: THREE.DoubleSide });
-    const roofMaterial = new THREE.MeshLambertMaterial({ color: 0x333333, side: THREE.DoubleSide });
-    const floorMaterial = new THREE.MeshLambertMaterial({ color: 0x999999 });
-    const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+    const exteriorColor = TEXTURES[currentExteriorTexture]?.color || 0x333333;
+    const wallMaterial = new THREE.MeshLambertMaterial({ color: exteriorColor, side: THREE.DoubleSide });
+    const roofMaterial = new THREE.MeshLambertMaterial({ color: 0x1a1a1a, side: THREE.DoubleSide });
+    const floorMaterial = new THREE.MeshLambertMaterial({ color: 0x444444 });
+    const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x666666, linewidth: 1 }); // Slightly lighter for visibility
 
     const t = wallThickness;
 
@@ -894,6 +913,14 @@ window.rotateTo = function (view, e) {
         left: [-Math.PI / 2, 0], top: [0, 1.5], iso: [-Math.PI / 4, 0.25],
     };
     if (views[view]) [targetAngle, targetVerticalAngle] = views[view];
+};
+
+window.setExterior = function(type, e) {
+    const evt = e || window.event;
+    currentExteriorTexture = type;
+    document.querySelectorAll("#exterior-options .style-option").forEach(o => o.classList.remove("active"));
+    if (evt && evt.currentTarget) evt.currentTarget.classList.add("active");
+    updateBuilding();
 };
 
 function animate() {

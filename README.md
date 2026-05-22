@@ -2,7 +2,7 @@
 
 A lightweight, interactive 3D web tool built with Three.js designed for modular building customization (sheds, cabins, and garages). The application provides real-time adjustments for building dimensions, floor shapes, and roof structures with clean architectural line tracking.
 
-🔗 **Live Demo:** [https://blaisesa.github.io/Modular-Steel-Homes/](https://blaisesa.github.io/Modular-Steel-Homes/)
+🔗 **Live Demo:** [https://blaisesa.github.io/Modular-Steel-Homes/](https://blaisesa.github.io/Modular-Steel-Homes/ )
 
 ---
 
@@ -20,34 +20,37 @@ The project features a responsive 3D viewport with fully integrated global state
 * **Scope Constraints:** Programmatic UI updates that disable incompatible features (e.g., Apex roofs on L-shaped footprints).
 
 ### 3. Integrated Aperture Engine (Windows & Doors)
-* **Raycasting Selection Matrix:** Full 3D selection support via `THREE.Raycaster`. Users can now interact directly with meshes in the canvas.
-* **Transform HUD:** Contextual floating widgets for real-time deletion, lateral movement, and proportional resizing.
+* **Drag & Drop Workflow:** Modernized placement system allowing users to select from a library of premade components and drag them directly onto wall surfaces.
+* **Premade Asset Library:** Includes standard, large, and small window presets, as well as standard and double door configurations.
+* **True Double Doors:** Double door assets are rendered as two distinct door leaves with a central meeting stile, rather than a single wide panel.
+* **Precise ID-Based Selection Matrix:** Enhanced 3D selection support via `THREE.Raycaster`. The engine now utilizes recursive parent traversal and unique `apertureId` mapping, ensuring that the exact component clicked is selected.
+* **Polished Transform HUD:** Contextual floating widgets with clear labels and refined UI cues for real-time deletion, lateral movement, and proportional resizing.
 * **Collision Guardrails:** Runtime checks to prevent out-of-bounds placement or overlapping component footprints with a `+ 0.02m` buffer.
 
-### 4. Viewport, UI, & Camera Kinematics
+### 4. Exterior & Visual Styling
+* **New Exterior Category:** Introduced a dedicated customization category for building exteriors.
+* **Texture Support:** Support for various exterior finishes including Modern Charcoal, Natural Cedar, Red Brick, and Industrial Steel.
+* **Architectural Clarity:** Optimized edge highlights (`#666666`) provide improved visual depth and structural definition.
+
+### 5. Viewport, UI, & Camera Kinematics
+* **Unified Pointer System:** Modernized interaction model using `pointerdown`, `pointermove`, and `pointerup` for seamless cross-device compatibility (touch and mouse).
 * **Cinematic Controls:** Smooth `lerp` interpolation for orbit and zoom, with smart camera framing for structural focus.
-* **Type-Aware Dynamic UI:** The configuration panel adapts to component types (e.g., hiding unnecessary sill height controls for floor-based doors).
 
 ---
 
-## Roadmap: Prioritizing UI/UX Refinement
+## Roadmap: Future Enhancements
 
-With the core interaction framework stabilized, the development focus is now centered on **UX fluidness and visual accessibility**.
+With the core interaction framework stabilized, the development focus is now centered on **advanced customization and output generation**.
 
-### 1. UI/UX Refinement (Priority Focus)
-* **Canvas Overlay Layer:** Transition the floating HUD from a generic DOM element to a high-fidelity, CSS-animated UI overlay that feels integrated into the viewport.
-* **Intuitive Interaction Cues:** Implement visual hover-states for walls and apertures (e.g., highlighting borders or changing cursor icons) to provide immediate feedback on interactable zones.
-* **Gestural Feedback:** Improve the "feel" of dragging by adding snapping-to-grid visual indicators and non-intrusive haptic/visual alerts when an aperture hits a structural constraint.
-* **Streamlined Asset Library:** Organize the component inventory into clear, collapsable categories with high-quality icons, reducing the cognitive load for new users.
-
-### 2. Component Framework Expansion
+### 1. Component Framework Expansion
+* **External Measurements:** Integrated 3D dimension lines for visual reference across wall panels and structural boundaries.
 * **MEP Integration:** Asset placement for electrical (sockets, switches) and lighting fixtures.
 * **Advanced Glazing:** Support for bifold doors, sliding windows, and custom facade glass.
 
-### 3. Customization & Visual Styling
+### 2. Customization & Visual Styling
 * **Per-Wall Material Isolation:** Support for distinct cladding types on individual panels.
-* **Material Library:** Integration of PBR textures (siding, metal, wood) and a custom color-picker palette.
+* **Material Library Expansion:** Integration of high-fidelity PBR textures and a custom color-picker palette.
 
-### 4. Output Generation & Analytics
+### 3. Output Generation & Analytics
 * **Real-Time Cost Calculator:** Real-time calculation of material costs based on dimensions and added features.
 * **2D Plan Generator:** Flattening of wall assemblies into downloadable 2D blueprints.
