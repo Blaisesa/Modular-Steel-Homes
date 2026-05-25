@@ -19,7 +19,7 @@ const TEXTURES = {
     metal: { color: 0x708090, name: "Industrial Steel" }
 };
 const roofOverhang = 0.2, slopeHeight = 0.45, peakHeight = 0.8;
-const wallThickness = 0.15, roofThickness = 0.15, roofGap = 0.02;
+const wallThickness = 0.15, roofThickness = 0.15, roofGap = 0;
 
 let walls = { front: null, back: null, left: null, right: null, innerBack: null, innerLeft: null };
 let wallVisibility = { front: true, back: true, left: true, right: true, innerBack: true, innerLeft: true };
@@ -111,6 +111,116 @@ function createGhostMesh() {
     ghostMesh.visible = false; 
     scene.add(ghostMesh);
 }
+
+function createTextSprite(text) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 64;
+    const context = canvas.getContext('2d');
+    
+    context.fillStyle = 'rgba(0,0,0,0)';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    
+    context.font = 'bold 24px Arial, sans-serif';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillStyle = '#666666'; 
+    context.fillText(text, canvas.width / 2, canvas.height / 2);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.minFilter = THREE.LinearFilter;
+    
+    const spriteMaterial = new THREE.SpriteMaterial({ 
+        map: texture, 
+        transparent: true, 
+        opacity: 0.9, 
+        depthTest: false 
+    });
+    const sprite = new THREE.Sprite(spriteMaterial);
+    sprite.scale.set(2.5, 0.625, 1); 
+    return sprite;
+}
+
+function createDimensionLine(start, end, offsetDir, offsetDist, text) {
+    const group = new THREE.Group();
+    const offset = offsetDir.clone().normalize().multiplyScalar(offsetDist);
+    const p1 = start.clone().add(offset);
+    const p2 = end.clone().add(offset);
+    
+    const material = new THREE.LineBasicMaterial({ 
+        color: 0x888888, 
+        transparent: true, 
+        opacity: 0.5 
+    });
+    
+    const points = [p1, p2];
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    group.add(new THREE.Line(geometry, material));
+    
+    const tickSize = 0.15;
+    const tickDir = offsetDir.clone().normalize();
+    
+    const p1a = p1.clone().add(tickDir.clone().multiplyScalar(tickSize));
+    const p1b = p1.clone().sub(tickDir.clone().multiplyScalar(tickSize));
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([p1a, p1b]), material));
+    
+    const p2a = p2.clone().add(tickDir.clone().multiplyScalar(tickSize));
+    const p2b = p2.clone().sub(tickDir.clone().multiplyScalar(tickSize));
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([p2a, p2b]), material));
+
+    const sprite = createTextSprite(text);
+    const midPoint = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
+    sprite.position.copy(midPoint);
+    sprite.position.y += 0.2; 
+    group.add(sprite);
+    
+    return group;
+}
+
+function addMeasurements(group) {
+    const dOffset = 0.45;
+    const yHeight = 0.05;
+
+    let p1 = new THREE.Vector3(-W/2, yHeight, D/2);
+    let p2 = new THREE.Vector3(W/2, yHeight, D/2);
+    group.add(createDimensionLine(p1, p2, new THREE.Vector3(0,0,1), dOffset, W.toFixed(1) + 'm'));
+    
+    p1 = new THREE.Vector3(W/2, yHeight, D/2);
+    p2 = new THREE.Vector3(W/2, yHeight, -D/2);
+    group.add(createDimensionLine(p1, p2, new THREE.Vector3(1,0,0), dOffset, D.toFixed(1) + 'm'));
+    
+    p1 = new THREE.Vector3(W/2, yHeight, -D/2);
+    p2 = new THREE.Vector3(-W/2, yHeight, -D/2);
+    group.add(createDimensionLine(p1, p2, new THREE.Vector3(0,0,-1), dOffset, W.toFixed(1) + 'm'));
+
+    p1 = new THREE.Vector3(-W/2, yHeight, -D/2);
+    p2 = new THREE.Vector3(-W/2, yHeight, D/2);
+    group.add(createDimensionLine(p1, p2, new THREE.Vector3(-1,0,0), dOffset, D.toFixed(1) + 'm'));
+    
+    let totalHeight = H + roofOverhang;
+    if (currentRoofType === "pent") {
+        totalHeight = H + slopeHeight;
+    } else if (currentRoofType === "apex") {
+        totalHeight = H + peakHeight;
+    }
+
+    p1 = new THREE.Vector3(-W/2, yHeight, -D/2);
+    p2 = new THREE.Vector3(-W/2, yHeight + totalHeight, -D/2);
+    group.add(createDimensionLine(p1, p2, new THREE.Vector3(-1,0,0), dOffset, totalHeight.toFixed(1) + 'm'));
+
+}
+
+let showMeasurements = true;
+
+window.toggleMeasurements = function(e) {
+    const evt = e || window.event;
+    showMeasurements = !showMeasurements;
+    if (evt && evt.currentTarget) {
+        evt.currentTarget.classList.toggle("active");
+    }
+    updateBuilding();
+};
+
 
 // POINTER EVENTS & CANVAS INTERACTION
 function setupCanvasInteraction(container) {
@@ -790,6 +900,9 @@ function updateBuilding() {
 
     applyWallVisibility();
     building = buildingGroup;
+    if (showMeasurements) {
+                addMeasurements(buildingGroup);
+            }
     scene.add(building);
 }
 

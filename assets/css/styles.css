@@ -747,6 +747,29 @@ body.resizing-height { cursor: ns-resize !important; }
     font-weight: 700; 
 }
 
+/* MEASUREMENTS TOGGLE */
+
+#measurements-toggle {
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid #ddd;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.2s ease;
+}
+
+#measurements-toggle.active {
+    background: #007bff;
+    color: white;
+    border-color: #0056b3;
+}
+
+#measurements-toggle:hover {
+    transform: scale(1.05);
+}
+
+
 /* RESPONSIVE DESIGN - Mobile adaptations */
 
 @media (max-width: 768px) {
