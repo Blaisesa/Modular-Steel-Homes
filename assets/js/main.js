@@ -18,7 +18,7 @@ const TEXTURES = {
     brick: { color: 0xa52a2a, name: "Red Brick" },
     metal: { color: 0x708090, name: "Industrial Steel" }
 };
-const roofOverhang = 0.2, slopeHeight = 0.45, peakHeight = 0.8;
+const roofOverhang = 0.2, slopeHeight = 0.45, peakHeight = 1.1;
 const wallThickness = 0.15, roofThickness = 0.15, roofGap = 0;
 
 let walls = { front: null, back: null, left: null, right: null, innerBack: null, innerLeft: null };
@@ -757,17 +757,38 @@ function createRoof(roofType, shape, buildingGroup, roofMaterial, isLShape = fal
         }
         buildingGroup.add(roof);
     } else if (roofType === "apex" && !isLShape) {
-        const angle = Math.atan2(peakHeight, D / 2);
-        const roofHalfWidth = D / 2 / Math.cos(angle) + roofOverhang;
-        const roofPlateGeo = new THREE.BoxGeometry(W + roofOverhang * 2, roofThickness, roofHalfWidth);
-        const zOffset = D / 4 + roofOverhang / 2;
-        const roofL = new THREE.Mesh(roofPlateGeo, roofMaterial);
-        roofL.position.set(0, H + peakHeight / 2 + roofThickness / 2 + roofGap, zOffset);
-        roofL.rotation.x = angle; buildingGroup.add(roofL);
-        const roofR = new THREE.Mesh(roofPlateGeo, roofMaterial);
-        roofR.position.set(0, H + peakHeight / 2 + roofThickness / 2 + roofGap, -zOffset);
-        roofR.rotation.x = -angle; buildingGroup.add(roofR);
-    } else {
+
+    const angle = Math.atan2(peakHeight, D / 2);
+
+    // slightly longer so the ridge overlaps
+    const roofHalfWidth =
+        (D / 2) / Math.cos(angle) + roofOverhang + 0.08;
+
+    const roofPlateGeo = new THREE.BoxGeometry(
+        W + roofOverhang * 2,
+        roofThickness,
+        roofHalfWidth
+    );
+
+    // overlap both halves toward center
+    const overlap = -0.085;
+
+    const zOffset = D / 4 - overlap;
+
+    // LOWER roof so underside touches walls
+    const roofY =
+        H + peakHeight / 2;
+
+    const roofL = new THREE.Mesh(roofPlateGeo, roofMaterial);
+    roofL.position.set(0, roofY, zOffset);
+    roofL.rotation.x = angle;
+    buildingGroup.add(roofL);
+
+    const roofR = new THREE.Mesh(roofPlateGeo, roofMaterial);
+    roofR.position.set(0, roofY, -zOffset);
+    roofR.rotation.x = -angle;
+    buildingGroup.add(roofR);
+} else {
         const roofGeo = new THREE.ExtrudeGeometry(shape, { steps: 1, depth: roofThickness, bevelEnabled: false });
         roofGeo.rotateX(-Math.PI / 2);
         const roof = new THREE.Mesh(roofGeo, roofMaterial);
