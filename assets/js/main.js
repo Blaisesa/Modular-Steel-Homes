@@ -840,32 +840,81 @@ function createRoof(roofType, shape, buildingGroup, roofMaterial, isLShape = fal
     }
 }
 
-// NEW FUNCTION: Force all apertures to respect new wall boundaries
+// NEW FUNCTION: Force all apertures to respect new wall boundaries and prevent overlaps
 function clampAllApertures() {
     const m = 0.02; // Edge margin to prevent Earcut crashes
-    for (let i = apertures.length - 1; i >= 0; i--) {
-        let ap = apertures[i];
-        const wallDim = getWallDimensions(ap.wallId);
+    const minWindowW = 0.3; // Minimum window width before we stop shrinking
+    const pad = 0.02; // Gap between apertures to prevent overlaps
 
-        // 1. If wall becomes smaller than the aperture itself, shrink the aperture
-        if (ap.w > wallDim.width - m * 2) {
-            ap.w = Math.max(0.3, wallDim.width - m * 2);
+    // Group apertures by wall so we only resolve collisions on the same plane
+    const wallGroups = {};
+    apertures.forEach(ap => {
+        if (!wallGroups[ap.wallId]) wallGroups[ap.wallId] = [];
+        wallGroups[ap.wallId].push(ap);
+    });
+
+    for (const wallId in wallGroups) {
+        let aps = wallGroups[wallId];
+        const wallDim = getWallDimensions(wallId);
+
+        // 1. Initial size clamp (Heights and Y positions)
+        aps.forEach(ap => {
+            if (ap.h > wallDim.height - m * 2) {
+                ap.h = Math.max(0.3, wallDim.height - m * 2);
+                if (ap.type === 'door') ap.y = ap.h / 2;
+            }
+            const halfH = ap.h / 2;
+            if (ap.type === 'door') {
+                ap.y = halfH;
+            } else {
+                ap.y = Math.max(halfH + m, Math.min(wallDim.height - halfH - m, ap.y));
+            }
+        });
+
+        // 2. Sort left-to-right by X position for spatial packing
+        aps.sort((a, b) => a.x - b.x);
+
+        // 3. If cumulative width is too large, shrink WINDOWS only
+        let totalRequiredW = aps.reduce((sum, ap) => sum + ap.w, 0) + (aps.length + 1) * pad;
+        if (totalRequiredW > wallDim.width) {
+            let deficit = totalRequiredW - wallDim.width;
+            let shrinkableWindows = aps.filter(ap => ap.type === 'window' && ap.w > minWindowW);
+            
+            // Iteratively shrink windows until they fit or hit their absolute minimum size
+            while (deficit > 0.01 && shrinkableWindows.length > 0) {
+                let share = deficit / shrinkableWindows.length;
+                for (let i = 0; i < shrinkableWindows.length; i++) {
+                    let ap = shrinkableWindows[i];
+                    let newW = Math.max(minWindowW, ap.w - share);
+                    let saved = ap.w - newW;
+                    ap.w = newW;
+                    deficit -= saved; // Deduct the saved width from our deficit
+                }
+                // Re-evaluate which windows can still be shrunk for the next pass
+                shrinkableWindows = aps.filter(ap => ap.type === 'window' && ap.w > minWindowW);
+            }
         }
-        if (ap.h > wallDim.height - m * 2) {
-            ap.h = Math.max(0.3, wallDim.height - m * 2);
-            if(ap.type === 'door') ap.y = ap.h / 2;
+
+        // 4. Pack left-to-right (Push overlaps safely to the right)
+        let currentX = -wallDim.width / 2 + m;
+        for (let i = 0; i < aps.length; i++) {
+            let ap = aps[i];
+            let halfW = ap.w / 2;
+            if (ap.x - halfW < currentX) {
+                ap.x = currentX + halfW;
+            }
+            currentX = ap.x + halfW + pad;
         }
 
-        // 2. Clamp their positions to the new edges
-        const halfW = ap.w / 2;
-        const halfH = ap.h / 2;
-
-        ap.x = Math.max(-wallDim.width / 2 + halfW + m, Math.min(wallDim.width / 2 - halfW - m, ap.x));
-
-        if (ap.type === 'door') {
-            ap.y = halfH;
-        } else {
-            ap.y = Math.max(halfH + m, Math.min(wallDim.height - halfH - m, ap.y));
+        // 5. Pack right-to-left (If L-to-R pushed them off the right edge, push back)
+        let currentRightX = wallDim.width / 2 - m;
+        for (let i = aps.length - 1; i >= 0; i--) {
+            let ap = aps[i];
+            let halfW = ap.w / 2;
+            if (ap.x + halfW > currentRightX) {
+                ap.x = currentRightX - halfW;
+            }
+            currentRightX = ap.x - halfW - pad;
         }
     }
 }
