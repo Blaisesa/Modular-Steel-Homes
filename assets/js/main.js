@@ -1102,10 +1102,60 @@ window.handleZoomSlider = function (val) {
 };
 
 window.updateDim = function (prop, val) {
-    if (prop === "W") W = parseFloat(val);
-    if (prop === "D") D = parseFloat(val);
+    let newVal = parseFloat(val);
+    let oldW = W, oldD = D;
+
+    // 1. Temporarily apply the new dimension to test it
+    if (prop === "W") W = newVal;
+    if (prop === "D") D = newVal;
+
+    // 2. Validate if the new dimensions can support the existing apertures
+    let isValid = true;
+    const m = 0.02; // Edge margin
+    const pad = 0.02; // Padding between apertures
+    const minWindowW = 0.3; // Minimum window width
+
+    // Group apertures by wall
+    const wallGroups = {};
+    apertures.forEach(ap => {
+        if (!wallGroups[ap.wallId]) wallGroups[ap.wallId] = [];
+        wallGroups[ap.wallId].push(ap);
+    });
+
+    // Check every wall to see if it violates the physical limits
+    for (const wallId in wallGroups) {
+        let aps = wallGroups[wallId];
+        const wallDim = getWallDimensions(wallId); // Uses the newly applied W/D
+
+        // Calculate absolute minimum required physical width for this wall
+        let minRequiredWidth = (m * 2) + (aps.length > 1 ? (aps.length - 1) * pad : 0);
+        aps.forEach(ap => {
+            minRequiredWidth += (ap.type === 'door' ? ap.w : minWindowW);
+        });
+
+        if (wallDim.width < minRequiredWidth) {
+            isValid = false;
+            break; // Stop checking, we found a violation
+        }
+    }
+
+    // 3. If invalid, revert the dimension and alert the user
+    if (!isValid) {
+        W = oldW;
+        D = oldD;
+        
+        // Ensure the input/slider visually reverts to the valid value
+        const inputElement = document.getElementById(`${prop.toLowerCase()}-slider`) || document.getElementById(`input-${prop.toLowerCase()}`);
+        if (inputElement) inputElement.value = (prop === 'W' ? W : D);
+        
+        showConstraintAlert(`Cannot shrink further. Remove or resize doors first.`, 'error');
+        return; // Abort the rest of the update
+    }
+
+    // 4. If valid, proceed with the update as normal
     const label = document.getElementById(`val-${prop.toLowerCase()}`);
-    if (label) label.innerText = val;
+    if (label) label.innerText = newVal;
+    
     updateBuilding();
     updateQuickStats(); 
     fitCamera();
