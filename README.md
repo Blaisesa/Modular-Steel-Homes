@@ -43,7 +43,6 @@ The project features a responsive 3D viewport with fully integrated global state
 With the core interaction framework stabilized, the development focus is now centered on **advanced customization and output generation**.
 
 ### 1. Component Framework Expansion
-* **External Measurements:** Integrated 3D dimension lines for visual reference across wall panels and structural boundaries.
 * **MEP Integration:** Asset placement for electrical (sockets, switches) and lighting fixtures.
 * **Advanced Glazing:** Support for bifold doors, sliding windows, and custom facade glass.
 
