@@ -247,7 +247,6 @@ function onPointerDown(event) {
 
     if (isPlacingNewAperture) {
         if (currentHoveredWall && ghostMesh && ghostMesh.visible && ghostMesh.material.color.getHex() === 0x00ff00) {
-            // Valid drop! Convert ghost position to real aperture
             const dropConfig = {
                 id: Date.now(),
                 type: placementConfig.type,
@@ -292,7 +291,6 @@ function onPointerDown(event) {
     const intersects = raycaster.intersectObjects(allApertureMeshes, true);
     if (intersects.length > 0) {
         let obj = intersects[0].object;
-        // Traverse up to find the group containing the aperture data
         while (obj && !obj.userData.apertureId && obj.parent) {
             obj = obj.parent;
         }
@@ -333,26 +331,31 @@ function onPointerMove(event) {
             const wallId = hitWallMesh.userData.wallId;
             currentHoveredWall = hitWallMesh;
             
-            // Math: World Raycast hit -> Wall Local Space
             const localHit = hitWallMesh.worldToLocal(hit.point.clone());
-            
-            let candY = placementConfig.type === 'door' ? placementConfig.h / 2 : localHit.y;
+            const wallDim = getWallDimensions(wallId);
+            const EDGE_PAD = 0.02; // Prevents hanging perfectly on edges
+            const halfW = placementConfig.w / 2;
+            const halfH = placementConfig.h / 2;
+
+            // Clamp ghost mesh positioning to wall bounds so it doesn't float off
+            let clampedX = Math.max(-wallDim.width / 2 + halfW + EDGE_PAD, Math.min(wallDim.width / 2 - halfW - EDGE_PAD, localHit.x));
+            let clampedY = placementConfig.type === 'door' ? halfH : Math.max(halfH + EDGE_PAD, Math.min(wallDim.height - halfH - EDGE_PAD, localHit.y));
             
             const candidate = {
                 id: 'temp', wallId: wallId, type: placementConfig.type,
                 w: placementConfig.w, h: placementConfig.h,
-                x: localHit.x, y: candY
+                x: clampedX, y: clampedY
             };
 
             const isValid = isValidAperture(candidate);
             ghostMesh.material.color.setHex(isValid ? 0x00ff00 : 0xff0000);
             ghostMesh.position.copy(hitWallMesh.position);
             ghostMesh.rotation.copy(hitWallMesh.rotation);
-            ghostMesh.translateX(localHit.x);
-            ghostMesh.translateY(candY);
+            ghostMesh.translateX(clampedX);
+            ghostMesh.translateY(clampedY);
             ghostMesh.translateZ(wallThickness / 2);
             ghostMesh.visible = true;
-            ghostMesh.userData = { localX: localHit.x, localY: candY };
+            ghostMesh.userData = { localX: clampedX, localY: clampedY };
         } else {
             ghostMesh.visible = false;
             currentHoveredWall = null;
@@ -375,14 +378,45 @@ function onPointerMove(event) {
             if (wid === 'right' || wid === 'innerLeft') localDeltaX = delta.z;
 
             let candidate = JSON.parse(JSON.stringify(dragStartAperture));
+            const wallDim = getWallDimensions(candidate.wallId);
+            const EDGE_PAD = 0.02; // Hard bounds limit
+            
             if (isDraggingAperture) {
                 candidate.x += localDeltaX;
                 candidate.y += localDeltaY;
+                
+                const halfW = candidate.w / 2;
+                const halfH = candidate.h / 2;
+                
+                // Clamp translation to edges
+                candidate.x = Math.max(-wallDim.width / 2 + halfW + EDGE_PAD, Math.min(wallDim.width / 2 - halfW - EDGE_PAD, candidate.x));
+                if (candidate.type === 'door') {
+                    candidate.y = halfH; 
+                } else {
+                    candidate.y = Math.max(halfH + EDGE_PAD, Math.min(wallDim.height - halfH - EDGE_PAD, candidate.y));
+                }
+
             } else if (resizeMode === 'width') {
-                candidate.w = Math.max(0.3, dragStartAperture.w + localDeltaX);
+                let newW = dragStartAperture.w + localDeltaX;
+                const maxWLeft = (candidate.x - (-wallDim.width / 2 + EDGE_PAD)) * 2;
+                const maxWRight = (wallDim.width / 2 - EDGE_PAD - candidate.x) * 2;
+                
+                // Clamp scale to not exceed edges based on current center
+                newW = Math.max(0.3, Math.min(newW, Math.min(maxWLeft, maxWRight)));
+                candidate.w = newW;
+
             } else if (resizeMode === 'height') {
-                candidate.h = Math.max(0.3, dragStartAperture.h + localDeltaY);
-                if (candidate.type === 'door') candidate.y = candidate.h / 2;
+                let newH = dragStartAperture.h + localDeltaY;
+                if (candidate.type === 'door') {
+                    newH = Math.max(0.3, Math.min(newH, wallDim.height - EDGE_PAD));
+                    candidate.h = newH;
+                    candidate.y = candidate.h / 2;
+                } else {
+                    const maxHBottom = (candidate.y - EDGE_PAD) * 2;
+                    const maxHTop = (wallDim.height - EDGE_PAD - candidate.y) * 2;
+                    newH = Math.max(0.3, Math.min(newH, Math.min(maxHBottom, maxHTop)));
+                    candidate.h = newH;
+                }
             }
 
             if (isValidAperture(candidate)) {
@@ -562,14 +596,10 @@ function updateApertureList() {
 }
 
 function updateQuickStats() {
-    // Area calculation based on shape logic in updateBuilding
     let area = 0;
     if (currentShapeType === "rectangle") {
         area = W * D;
     } else {
-        // L-shape floor logic: 
-        // rectangle 1: (-W/2 to 0, -D/2 to D/2) -> W/2 * D
-        // rectangle 2: (0 to W/2, -D/2 to 0) -> W/2 * D/2
         area = (W/2 * D) + (W/2 * D/2);
     }
     
@@ -587,7 +617,7 @@ function isValidAperture(candidate) {
     if (
         (candidate.x - halfW) < -wallDim.width / 2 || 
         (candidate.x + halfW) > wallDim.width / 2 || 
-        (candidate.y - halfH) < 0 || 
+        (candidate.y - halfH) < (candidate.type === 'door' ? -0.01 : 0) || 
         (candidate.y + halfH) > wallDim.height
     ) return false;
 
@@ -627,15 +657,31 @@ function getWallDimensions(wallId) {
 }
 
 function createWallShapeWithHoles(wallId, baseShape) {
+    const wallDim = getWallDimensions(wallId);
     const wallApertures = apertures.filter(a => a.wallId === wallId);
     wallApertures.forEach(aperture => {
         const hole = new THREE.Path();
-        const hw = aperture.w / 2, hh = aperture.h / 2;
-        hole.moveTo(aperture.x - hw, aperture.y - hh);
-        hole.lineTo(aperture.x + hw, aperture.y - hh);
-        hole.lineTo(aperture.x + hw, aperture.y + hh);
-        hole.lineTo(aperture.x - hw, aperture.y + hh);
-        hole.lineTo(aperture.x - hw, aperture.y - hh);
+        
+        // Micro-margin to prevent Three.js triangulation failure when holes touch the shape edge.
+        const m = 0.002; 
+        
+        let left = aperture.x - (aperture.w / 2) + m;
+        let right = aperture.x + (aperture.w / 2) - m;
+        let bottom = aperture.y - (aperture.h / 2);
+        let top = aperture.y + (aperture.h / 2) - m;
+
+        // Force the hole strictly inside the bounds of the 2D plane
+        if (bottom < m) bottom = m;
+        if (left < -wallDim.width / 2 + m) left = -wallDim.width / 2 + m;
+        if (right > wallDim.width / 2 - m) right = wallDim.width / 2 - m;
+        if (top > wallDim.height - m) top = wallDim.height - m;
+
+        hole.moveTo(left, bottom);
+        hole.lineTo(right, bottom);
+        hole.lineTo(right, top);
+        hole.lineTo(left, top);
+        hole.lineTo(left, bottom);
+        
         baseShape.holes.push(hole);
     });
     return baseShape;
@@ -673,7 +719,7 @@ function buildApertureComponents(wallId, wallMesh, buildingGroup) {
             const glass = new THREE.Mesh(new THREE.BoxGeometry(aperture.w - frameThickness * 2, aperture.h - frameThickness * 2, frameDepth * 0.3), glassMaterial);
             group.add(glass);
         } else if (aperture.type === 'door') {
-            const isDouble = aperture.w > 1.5; // Logic for double door
+            const isDouble = aperture.w > 1.5; 
             if (isDouble) {
                 const leafW = (aperture.w - (frameThickness * 3)) / 2;
                 const doorL = new THREE.Mesh(new THREE.BoxGeometry(leafW, aperture.h - frameThickness, frameDepth * 0.7), doorMaterial);
@@ -760,7 +806,6 @@ function createRoof(roofType, shape, buildingGroup, roofMaterial, isLShape = fal
 
     const angle = Math.atan2(peakHeight, D / 2);
 
-    // slightly longer so the ridge overlaps
     const roofHalfWidth =
         (D / 2) / Math.cos(angle) + roofOverhang + 0.08;
 
@@ -770,12 +815,9 @@ function createRoof(roofType, shape, buildingGroup, roofMaterial, isLShape = fal
         roofHalfWidth
     );
 
-    // overlap both halves toward center
     const overlap = -0.085;
-
     const zOffset = D / 4 - overlap;
 
-    // LOWER roof so underside touches walls
     const roofY =
         H + peakHeight / 2;
 
@@ -798,7 +840,39 @@ function createRoof(roofType, shape, buildingGroup, roofMaterial, isLShape = fal
     }
 }
 
+// NEW FUNCTION: Force all apertures to respect new wall boundaries
+function clampAllApertures() {
+    const m = 0.02; // Edge margin to prevent Earcut crashes
+    for (let i = apertures.length - 1; i >= 0; i--) {
+        let ap = apertures[i];
+        const wallDim = getWallDimensions(ap.wallId);
+
+        // 1. If wall becomes smaller than the aperture itself, shrink the aperture
+        if (ap.w > wallDim.width - m * 2) {
+            ap.w = Math.max(0.3, wallDim.width - m * 2);
+        }
+        if (ap.h > wallDim.height - m * 2) {
+            ap.h = Math.max(0.3, wallDim.height - m * 2);
+            if(ap.type === 'door') ap.y = ap.h / 2;
+        }
+
+        // 2. Clamp their positions to the new edges
+        const halfW = ap.w / 2;
+        const halfH = ap.h / 2;
+
+        ap.x = Math.max(-wallDim.width / 2 + halfW + m, Math.min(wallDim.width / 2 - halfW - m, ap.x));
+
+        if (ap.type === 'door') {
+            ap.y = halfH;
+        } else {
+            ap.y = Math.max(halfH + m, Math.min(wallDim.height - halfH - m, ap.y));
+        }
+    }
+}
+
 function updateBuilding() {
+    clampAllApertures(); // Run the boundary sweep BEFORE generating geometry
+
     if (building) {
         scene.remove(building);
         building.traverse((child) => {
@@ -818,7 +892,7 @@ function updateBuilding() {
     const wallMaterial = new THREE.MeshLambertMaterial({ color: exteriorColor, side: THREE.DoubleSide });
     const roofMaterial = new THREE.MeshLambertMaterial({ color: 0x1a1a1a, side: THREE.DoubleSide });
     const floorMaterial = new THREE.MeshLambertMaterial({ color: 0x444444 });
-    const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x666666, linewidth: 1 }); // Slightly lighter for visibility
+    const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x666666, linewidth: 1 }); 
 
     const t = wallThickness;
 
@@ -931,7 +1005,7 @@ function addMeshWithEdges(geo, mat, edgeMat, group, wallId) {
     const mesh = new THREE.Mesh(geo, mat);
     const edges = new THREE.EdgesGeometry(geo);
     const line = new THREE.LineSegments(edges, edgeMat);
-    mesh.userData = { edgeLine: line, wallId: wallId }; // Store wallId for raycast dragging
+    mesh.userData = { edgeLine: line, wallId: wallId }; 
     mesh.add(line);
     group.add(mesh);
     return mesh;
@@ -984,7 +1058,7 @@ window.updateDim = function (prop, val) {
     const label = document.getElementById(`val-${prop.toLowerCase()}`);
     if (label) label.innerText = val;
     updateBuilding();
-    updateQuickStats(); // Ensure area updates in real-time
+    updateQuickStats(); 
     fitCamera();
 };
 
@@ -1117,7 +1191,6 @@ function init() {
     updateBuilding();
     fitCamera();
     
-    // Desktop wheel zoom
     container.addEventListener("wheel", (e) => {
         e.preventDefault();
         targetRadius = Math.max(5, Math.min(25, targetRadius + (e.deltaY > 0 ? 0.5 : -0.5)));
