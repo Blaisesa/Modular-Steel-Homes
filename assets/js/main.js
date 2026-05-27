@@ -750,6 +750,21 @@ function buildApertureComponents(wallId, wallMesh, buildingGroup) {
         group.translateX(aperture.x);
         group.translateY(aperture.y);
         group.translateZ(wallThickness / 2);
+        if (isSelected) {
+            const dOffset = 0.25; // How far the line sits from the frame
+            
+            // Top dimension (Width)
+            const p1Top = new THREE.Vector3(-aperture.w / 2, aperture.h / 2, 0);
+            const p2Top = new THREE.Vector3(aperture.w / 2, aperture.h / 2, 0);
+            const upDir = new THREE.Vector3(0, 1, 0);
+            group.add(createDimensionLine(p1Top, p2Top, upDir, dOffset, aperture.w.toFixed(2) + 'm'));
+
+            // Left dimension (Height)
+            const p1Left = new THREE.Vector3(-aperture.w / 2, -aperture.h / 2, 0);
+            const p2Left = new THREE.Vector3(-aperture.w / 2, aperture.h / 2, 0);
+            const leftDir = new THREE.Vector3(-1, 0, 0);
+            group.add(createDimensionLine(p1Left, p2Left, leftDir, dOffset, aperture.h.toFixed(2) + 'm'));
+        }
         
         if (!apertureComponents[wallId]) apertureComponents[wallId] = [];
         apertureComponents[wallId].push(group);
