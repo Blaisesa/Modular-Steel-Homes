@@ -1044,9 +1044,11 @@ function updateBuilding() {
 
     applyWallVisibility();
     building = buildingGroup;
-    if (showMeasurements) {
-                addMeasurements(buildingGroup);
-            }
+    // Measurements are added after the building is fully constructed to ensure they are on top and not affected by geometry changes during construction
+    if (showMeasurements && !selectedApertureData) {
+        addMeasurements(buildingGroup);
+    }
+    
     scene.add(building);
 }
 
