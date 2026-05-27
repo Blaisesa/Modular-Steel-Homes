@@ -545,13 +545,34 @@ function showConstraintAlert(message, type = 'error') {
 function selectAperture(data) {
     selectedApertureData = data;
     showTransformHUD(data);
-    updateBuilding();
+    updateBuilding(); // Triggers the swap from global to local measurements
+
+    // Camera Focus Magic
+    const views = {
+        front: [0, 0.1], 
+        back: [Math.PI, 0.1],
+        left: [-Math.PI / 2, 0.1], 
+        right: [Math.PI / 2, 0.1], 
+        innerBack: [0, 0.1], 
+        innerLeft: [Math.PI / 2, 0.1]
+    };
+
+    if (views[data.wallId]) {
+        // Rotate to face the wall
+        targetAngle = views[data.wallId][0];
+        targetVerticalAngle = views[data.wallId][1];
+        
+        // Zoom in (Scale zoom based on aperture size so large double doors don't clip)
+        const maxDim = Math.max(data.w, data.h);
+        targetRadius = Math.max(7.5, maxDim * 3.5);
+    }
 }
 
 function deselectAperture() {
     selectedApertureData = null;
     hideTransformHUD();
-    updateBuilding();
+    updateBuilding(); // Brings the exterior measurements back
+    fitCamera(); // Zooms the camera back out to view the whole building
 }
 
 window.deleteSelectedAperture = function() {
