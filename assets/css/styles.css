@@ -195,7 +195,7 @@ input[type="range"] {
     transition: all 0.3s var(--ease-out-snappy);
 }
 
-/* VIEW CONTROLS - Refined with better visual hierarchy */
+/* VIEW CONTROLS */
 
 .view-controls {
     position: absolute; 
@@ -262,13 +262,14 @@ input[type="range"] {
     font-weight: 500;
 }
 
-/* ZOOM SLIDER - Refined with better visual feedback */
+/* ZOOM SLIDER */
 
 .zoom-slider-container {
     position: absolute;
     bottom: 30px;
     right: 30px;
     display: flex;
+    width: 50px;
     flex-direction: column;
     align-items: center;
     gap: 12px;
@@ -321,17 +322,6 @@ input[type="range"] {
     transform: scale(1.05);
 }
 
-#zoom-slider::-moz-range-thumb {
-    width: 18px;
-    height: 18px;
-    background: white;
-    border-radius: 50%;
-    cursor: pointer;
-    border: 3px solid var(--accent-color);
-    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
-    transition: all 0.2s var(--ease-out-snappy);
-}
-
 .zoom-label {
     font-size: 9px;
     text-transform: uppercase;
@@ -340,7 +330,7 @@ input[type="range"] {
     letter-spacing: 0.5px;
 }
 
-/* CANVAS OVERLAY - Base layer for HUD elements */
+/* CANVAS OVERLAY */
 
 .canvas-overlay {
     position: absolute;
@@ -352,117 +342,124 @@ input[type="range"] {
     z-index: 100;
 }
 
-/* HUD PILL - High-fidelity transform controls Design: Glassmorphic pill with smooth animations, clear visual hierarchy */
-
-.hud-pill {
+/* NEW PROPERTIES PANEL */
+.properties-panel {
     position: absolute;
-    background: rgba(255, 255, 255, 0.88);
-    border: 1px solid rgba(255, 255, 255, 0.6);
-    border-radius: 50px;
-    padding: 8px 12px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 
-                0 0 0 1px rgba(255, 255, 255, 0.8) inset;
-    z-index: 1000;
-    display: none;
-    align-items: center;
-    gap: 4px;
-    pointer-events: auto;
+    bottom: 30px;
+    right: 100px;
+    width: 260px;
+    background: rgba(255, 255, 255, 0.92);
+    border-radius: 16px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12), 
+                0 0 0 1px rgba(255, 255, 255, 0.6) inset;
     backdrop-filter: blur(14px);
-    animation: hudPop 0.3s var(--ease-out-snappy);
-    transform-origin: bottom center;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    transition: opacity 0.3s var(--ease-out-snappy), transform 0.3s var(--ease-out-snappy);
+    transform-origin: bottom right;
 }
 
-@keyframes hudPop {
-    from { 
-        opacity: 0; 
-        transform: translate(-50%, calc(-100% - 12px)) scale(0.85);
-    }
-    to { 
-        opacity: 1; 
-        transform: translate(-50%, -100%) scale(1);
-    }
+.properties-panel.hidden {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+    pointer-events: none;
+    visibility: hidden;
 }
 
-.hud-pill.hidden {
-    display: none !important;
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
 
-.hud-label {
-    font-size: 11px;
+.panel-header h3 {
+    margin: 0;
+    font-size: 13px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: var(--text-muted);
-    padding: 0 4px;
-}
-
-.hud-pill-btn {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    border: none;
-    background: transparent;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
     color: var(--text-dark);
-    transition: all 0.2s var(--ease-out-snappy);
-    position: relative;
-    flex-shrink: 0;
 }
 
-.hud-pill-btn::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    background: rgba(0, 123, 255, 0.08);
-    opacity: 0;
-    transition: opacity 0.2s var(--ease-out-snappy);
+.panel-header .close-btn {
+    background: transparent;
+    border: none;
+    font-size: 14px;
+    cursor: pointer;
+    color: var(--text-muted);
+    padding: 4px;
+    transition: color 0.2s;
 }
 
-.hud-pill-btn:hover::before {
-    opacity: 1;
-}
-
-.hud-pill-btn:hover {
-    background: rgba(255, 255, 255, 0.95);
-    transform: scale(1.12);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.hud-pill-btn:active {
-    transform: scale(0.96);
-}
-
-.hud-pill-btn.danger {
+.panel-header .close-btn:hover {
     color: var(--danger-color);
 }
 
-.hud-pill-btn.danger:hover::before {
-    background: rgba(220, 53, 69, 0.08);
+.panel-body {
+    padding: 16px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
 }
 
-.hud-pill-btn.close {
-    font-size: 14px;
-    opacity: 0.7;
+.prop-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
 }
 
-.hud-pill-btn.close:hover {
-    opacity: 1;
-    color: var(--text-dark);
+.prop-group label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
 }
 
-.hud-pill-divider {
-    width: 1px;
-    height: 24px;
-    background: rgba(0, 0, 0, 0.08);
-    margin: 0 6px;
+.prop-group input {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 13px;
+    background: white;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    box-sizing: border-box;
+    font-family: inherit;
 }
 
-/* PLACEMENT UI - Drag & drop visual feedback Design: Dark overlay with clear instructions, smooth transitions */
+.prop-group input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px var(--accent-light);
+}
+
+.panel-footer {
+    padding: 12px 16px;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.danger-btn {
+    width: 100%;
+    padding: 8px;
+    background: var(--danger-light);
+    color: var(--danger-color);
+    border: 1px solid transparent;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.danger-btn:hover {
+    background: var(--danger-color);
+    color: white;
+}
+
+/* PLACEMENT UI */
 
 .placement-ui {
     position: absolute;
@@ -517,14 +514,12 @@ input[type="range"] {
     transform: translateY(0);
 }
 
-/* CURSOR STATES - Visual feedback during interactions */
+/* CURSOR STATES */
 
 body.placing-aperture { cursor: crosshair !important; }
 body.dragging-aperture { cursor: move !important; }
-body.resizing-width { cursor: ew-resize !important; }
-body.resizing-height { cursor: ns-resize !important; }
 
-/* CONSTRAINT ALERT - Non-intrusive feedback Design: Smooth entrance/exit animations, clear visual distinction */
+/* CONSTRAINT ALERT */
 
 .constraint-alert {
     position: fixed;
@@ -576,7 +571,7 @@ body.resizing-height { cursor: ns-resize !important; }
     font-weight: 700;
 }
 
-/* APERTURE LIBRARY - Asset organization */
+/* APERTURE LIBRARY */
 
 .aperture-library { 
     padding: 0 20px 15px; 
@@ -701,7 +696,7 @@ body.resizing-height { cursor: ns-resize !important; }
     color: var(--text-muted); 
 }
 
-/* QUICK STATS - Real-time information display */
+/* QUICK STATS */
 
 .quick-stats {
     position: absolute;
@@ -770,7 +765,7 @@ body.resizing-height { cursor: ns-resize !important; }
 }
 
 
-/* RESPONSIVE DESIGN - Mobile adaptations */
+/* RESPONSIVE DESIGN */
 
 @media (max-width: 768px) {
     #menu-toggle { display: flex; }
@@ -842,14 +837,15 @@ body.resizing-height { cursor: ns-resize !important; }
         width: max-content; 
     }
 
-    .hud-pill {
-        padding: 6px 10px;
+    .properties-panel {
+        right: 50%;
+        transform: translateX(50%);
+        bottom: 140px; 
+        transform-origin: bottom center;
     }
 
-    .hud-pill-btn {
-        width: 36px;
-        height: 36px;
-        font-size: 14px;
+    .properties-panel.hidden {
+        transform: translateX(50%) scale(0.95) translateY(10px);
     }
 }
 

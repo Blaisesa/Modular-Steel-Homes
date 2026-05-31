@@ -91,12 +91,12 @@
                     <div class="nav-content">
                         <div class="control-group">
                             <label>Width: <span id="val-w">6</span>m</label>
-                            <input type="range" min="3" max="12" step="0.5" value="6"
+                            <input type="range" id="w-slider" min="3" max="12" step="0.5" value="6"
                                 oninput="updateDim('W', this.value)">
                         </div>
                         <div class="control-group">
                             <label>Depth: <span id="val-d">4</span>m</label>
-                            <input type="range" min="3" max="10" step="0.5" value="4"
+                            <input type="range" id="d-slider" min="3" max="10" step="0.5" value="4"
                                 oninput="updateDim('D', this.value)">
                         </div>
                     </div>
@@ -196,6 +196,34 @@
         </div>
 
         <div id="sidebar-overlay" onclick="toggleSidebar()"></div>
+    </div>
+
+    <div id="properties-panel" class="properties-panel hidden">
+        <div class="panel-header">
+            <h3 id="prop-panel-title">Properties</h3>
+            <button class="close-btn" onclick="deselectAperture()">✖</button>
+        </div>
+        <div class="panel-body">
+            <div class="prop-group">
+                <label>Width (m)</label>
+                <input type="number" id="prop-w" step="0.05" min="0.3" onchange="updateApertureProp('w', this.value)">
+            </div>
+            <div class="prop-group">
+                <label>Height (m)</label>
+                <input type="number" id="prop-h" step="0.05" min="0.3" onchange="updateApertureProp('h', this.value)">
+            </div>
+            <div class="prop-group">
+                <label>Offset X (m)</label>
+                <input type="number" id="prop-x" step="0.05" onchange="updateApertureProp('x', this.value)">
+            </div>
+            <div class="prop-group" id="prop-group-y">
+                <label>Offset Y (m)</label>
+                <input type="number" id="prop-y" step="0.05" onchange="updateApertureProp('y', this.value)">
+            </div>
+        </div>
+        <div class="panel-footer">
+            <button class="danger-btn" onclick="deleteSelectedAperture()">🗑️ Delete Aperture</button>
+        </div>
     </div>
 
     <div id="placement-ui" class="placement-ui hidden">

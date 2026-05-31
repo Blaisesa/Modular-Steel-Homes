@@ -37,7 +37,6 @@ let raycaster = new THREE.Raycaster();
 let mouse = new THREE.Vector2();
 let selectedApertureData = null;
 let isDraggingAperture = false;
-let resizeMode = null; 
 let dragPlane = new THREE.Plane();
 let dragStartPos = new THREE.Vector3();
 let dragStartAperture = null;
@@ -207,7 +206,6 @@ function addMeasurements(group) {
     p1 = new THREE.Vector3(-W/2, yHeight, -D/2);
     p2 = new THREE.Vector3(-W/2, yHeight + totalHeight, -D/2);
     group.add(createDimensionLine(p1, p2, new THREE.Vector3(-1,0,0), dOffset, totalHeight.toFixed(1) + 'm'));
-
 }
 
 let showMeasurements = true;
@@ -266,21 +264,7 @@ function onPointerDown(event) {
         return;
     }
 
-    if (selectedApertureData && (isDraggingAperture || resizeMode)) {
-        const normal = wallNormals[selectedApertureData.wallId];
-        const wallMesh = walls[selectedApertureData.wallId];
-        const wallWorldPos = new THREE.Vector3();
-        wallMesh.getWorldPosition(wallWorldPos);
-        
-        dragPlane.setFromNormalAndCoplanarPoint(normal, wallWorldPos);
-        raycaster.ray.intersectPlane(dragPlane, dragStartPos);
-        dragStartAperture = JSON.parse(JSON.stringify(selectedApertureData));
-        
-        if (event.pointerType !== 'mouse') event.preventDefault(); // Stop orbit on touch drag
-        return;
-    }
-
-    // Try selecting an aperture
+    // Process selection and potential dragging
     const allApertureMeshes = [];
     Object.values(apertureComponents).forEach(compArray => {
         compArray.forEach(group => {
@@ -289,6 +273,7 @@ function onPointerDown(event) {
     });
 
     const intersects = raycaster.intersectObjects(allApertureMeshes, true);
+    
     if (intersects.length > 0) {
         let obj = intersects[0].object;
         while (obj && !obj.userData.apertureId && obj.parent) {
@@ -296,15 +281,35 @@ function onPointerDown(event) {
         }
 
         if (obj && obj.userData.apertureId) {
-            const apertureData = apertures.find(a => a.id === obj.userData.apertureId);
-            if (apertureData) {
-                if (isFreeRoam) {
-                    window.toggleFreeRoam();
-                    const viewMap = { front: 'front', innerBack: 'front', back: 'back', left: 'left', right: 'right', innerLeft: 'right' };
-                    window.rotateTo(viewMap[apertureData.wallId]);
-                }
-                selectAperture(apertureData);
+            const clickedId = obj.userData.apertureId;
+            
+            if (selectedApertureData && selectedApertureData.id === clickedId) {
+                // User clicked an already selected aperture -> Start drag mode
+                isDraggingAperture = true;
+                const normal = wallNormals[selectedApertureData.wallId];
+                const wallMesh = walls[selectedApertureData.wallId];
+                const wallWorldPos = new THREE.Vector3();
+                wallMesh.getWorldPosition(wallWorldPos);
+                
+                dragPlane.setFromNormalAndCoplanarPoint(normal, wallWorldPos);
+                raycaster.ray.intersectPlane(dragPlane, dragStartPos);
+                dragStartAperture = JSON.parse(JSON.stringify(selectedApertureData));
+                
+                document.body.classList.add('dragging-aperture');
+                if (event.pointerType !== 'mouse') event.preventDefault(); // Stop orbit on touch
                 return;
+            } else {
+                // User clicked a different aperture -> Select it
+                const apertureData = apertures.find(a => a.id === clickedId);
+                if (apertureData) {
+                    if (isFreeRoam) {
+                        window.toggleFreeRoam();
+                        const viewMap = { front: 'front', innerBack: 'front', back: 'back', left: 'left', right: 'right', innerLeft: 'right' };
+                        window.rotateTo(viewMap[apertureData.wallId]);
+                    }
+                    selectAperture(apertureData);
+                    return;
+                }
             }
         }
     } else {
@@ -363,7 +368,7 @@ function onPointerMove(event) {
         return;
     }
 
-    if (selectedApertureData && (isDraggingAperture || resizeMode) && dragStartAperture) {
+    if (isDraggingAperture && selectedApertureData && dragStartAperture) {
         updateMousePosition(event);
         raycaster.setFromCamera(mouse, camera);
         let currentPt = new THREE.Vector3();
@@ -381,42 +386,18 @@ function onPointerMove(event) {
             const wallDim = getWallDimensions(candidate.wallId);
             const EDGE_PAD = 0.02; // Hard bounds limit
             
-            if (isDraggingAperture) {
-                candidate.x += localDeltaX;
-                candidate.y += localDeltaY;
-                
-                const halfW = candidate.w / 2;
-                const halfH = candidate.h / 2;
-                
-                // Clamp translation to edges
-                candidate.x = Math.max(-wallDim.width / 2 + halfW + EDGE_PAD, Math.min(wallDim.width / 2 - halfW - EDGE_PAD, candidate.x));
-                if (candidate.type === 'door') {
-                    candidate.y = halfH; 
-                } else {
-                    candidate.y = Math.max(halfH + EDGE_PAD, Math.min(wallDim.height - halfH - EDGE_PAD, candidate.y));
-                }
-
-            } else if (resizeMode === 'width') {
-                let newW = dragStartAperture.w + localDeltaX;
-                const maxWLeft = (candidate.x - (-wallDim.width / 2 + EDGE_PAD)) * 2;
-                const maxWRight = (wallDim.width / 2 - EDGE_PAD - candidate.x) * 2;
-                
-                // Clamp scale to not exceed edges based on current center
-                newW = Math.max(0.3, Math.min(newW, Math.min(maxWLeft, maxWRight)));
-                candidate.w = newW;
-
-            } else if (resizeMode === 'height') {
-                let newH = dragStartAperture.h + localDeltaY;
-                if (candidate.type === 'door') {
-                    newH = Math.max(0.3, Math.min(newH, wallDim.height - EDGE_PAD));
-                    candidate.h = newH;
-                    candidate.y = candidate.h / 2;
-                } else {
-                    const maxHBottom = (candidate.y - EDGE_PAD) * 2;
-                    const maxHTop = (wallDim.height - EDGE_PAD - candidate.y) * 2;
-                    newH = Math.max(0.3, Math.min(newH, Math.min(maxHBottom, maxHTop)));
-                    candidate.h = newH;
-                }
+            candidate.x += localDeltaX;
+            candidate.y += localDeltaY;
+            
+            const halfW = candidate.w / 2;
+            const halfH = candidate.h / 2;
+            
+            // Clamp translation to edges
+            candidate.x = Math.max(-wallDim.width / 2 + halfW + EDGE_PAD, Math.min(wallDim.width / 2 - halfW - EDGE_PAD, candidate.x));
+            if (candidate.type === 'door') {
+                candidate.y = halfH; 
+            } else {
+                candidate.y = Math.max(halfH + EDGE_PAD, Math.min(wallDim.height - halfH - EDGE_PAD, candidate.y));
             }
 
             if (isValidAperture(candidate)) {
@@ -424,6 +405,7 @@ function onPointerMove(event) {
                 if (index !== -1) {
                     apertures[index] = candidate;
                     selectedApertureData = candidate;
+                    showPropertiesPanel(candidate); // Bi-directional real-time UI update
                     updateBuilding();
                 }
             }
@@ -443,82 +425,88 @@ function onPointerMove(event) {
 
 function onPointerUp() {
     isDragging = false;
-    if (isDraggingAperture || resizeMode) {
+    if (isDraggingAperture) {
         isDraggingAperture = false;
-        resizeMode = null;
         dragStartAperture = null;
-        document.body.classList.remove('dragging-aperture', 'resizing-width', 'resizing-height');
+        document.body.classList.remove('dragging-aperture');
         updateApertureList();
         updateQuickStats();
     }
 }
 
-// PILL HUD & NOTIFICATIONS
-function showTransformHUD(data) {
-    let overlay = document.getElementById('canvas-overlay');
-    if (!overlay) {
-        overlay = document.createElement('div');
-        overlay.id = 'canvas-overlay';
-        overlay.className = 'canvas-overlay';
-        document.getElementById("builder-viewport").appendChild(overlay);
+// PROPERTIES PANEL UI & NOTIFICATIONS
+function showPropertiesPanel(data) {
+    const panel = document.getElementById('properties-panel');
+    if (!panel) return;
+
+    document.getElementById('prop-panel-title').innerText = data.type.toUpperCase() + ' PROPERTIES';
+    
+    document.getElementById('prop-w').value = data.w.toFixed(2);
+    document.getElementById('prop-h').value = data.h.toFixed(2);
+    document.getElementById('prop-x').value = data.x.toFixed(2);
+    
+    const yGroup = document.getElementById('prop-group-y');
+    if (data.type === 'door') {
+        yGroup.style.display = 'none';
+    } else {
+        yGroup.style.display = 'flex';
+        document.getElementById('prop-y').value = data.y.toFixed(2);
     }
     
-    let hud = document.getElementById('transform-hud');
-    if (!hud) {
-        hud = document.createElement('div');
-        hud.id = 'transform-hud';
-        hud.className = 'hud-pill';
-        overlay.appendChild(hud);
-    }
-    
-    hud.innerHTML = `
-        <div class="hud-label">${data.type.toUpperCase()}</div>
-        <button class="hud-pill-btn" onclick="startMove()" title="Move">↔️</button>
-        <button class="hud-pill-btn" onclick="startResize('width')" title="Resize Width">📏</button>
-        <button class="hud-pill-btn" onclick="startResize('height')" title="Resize Height">📐</button>
-        <div class="hud-pill-divider"></div>
-        <button class="hud-pill-btn danger" onclick="deleteSelectedAperture()" title="Delete">🗑️</button>
-        <button class="hud-pill-btn close" onclick="deselectAperture()" title="Close">✖️</button>
-    `;
-    hud.style.display = 'flex';
+    panel.classList.remove('hidden');
 }
 
-function hideTransformHUD() {
-    const hud = document.getElementById('transform-hud');
-    if (hud) hud.style.display = 'none';
-    resizeMode = null;
-    isDraggingAperture = false;
-    document.body.classList.remove('dragging-aperture', 'resizing-width', 'resizing-height');
+function hidePropertiesPanel() {
+    const panel = document.getElementById('properties-panel');
+    if (panel) panel.classList.add('hidden');
 }
 
-function updateTransformHUDPosition() {
+window.updateApertureProp = function(prop, value) {
     if (!selectedApertureData) return;
-    
-    let currentGroup = null;
-    if (apertureComponents[selectedApertureData.wallId]) {
-        currentGroup = apertureComponents[selectedApertureData.wallId].find(
-            g => g.userData.apertureId === selectedApertureData.id
-        );
-    }
-    if (!currentGroup) return;
+    let val = parseFloat(value);
+    if (isNaN(val)) return;
 
-    const pos = new THREE.Vector3();
-    currentGroup.getWorldPosition(pos);
-    pos.y += selectedApertureData.h / 2 + 0.5; 
-    pos.project(camera);
-    
-    const container = document.getElementById("builder-viewport");
-    if (!container) return;
-    const rect = container.getBoundingClientRect();
-    const x = (pos.x * 0.5 + 0.5) * rect.width + rect.left;
-    const y = (pos.y * -0.5 + 0.5) * rect.height + rect.top;
-    
-    const hud = document.getElementById('transform-hud');
-    if (hud && hud.style.display !== 'none') {
-        hud.style.left = `${x}px`;
-        hud.style.top = `${y}px`;
+    let candidate = JSON.parse(JSON.stringify(selectedApertureData));
+    candidate[prop] = val;
+
+    // Doors must have Y exactly half of H
+    if (candidate.type === 'door' && prop === 'h') {
+        candidate.y = val / 2;
     }
-}
+
+    // Apply strict dimensional clamps relative to wall
+    const wallDim = getWallDimensions(candidate.wallId);
+    const m = 0.02; // Edge padding margin
+    const halfW = candidate.w / 2;
+    const halfH = candidate.h / 2;
+
+    if (prop === 'w') {
+        candidate.w = Math.min(candidate.w, wallDim.width - m * 2);
+    } else if (prop === 'h') {
+        candidate.h = Math.min(candidate.h, wallDim.height - m * 2);
+        if (candidate.type === 'door') candidate.y = candidate.h / 2;
+    } else if (prop === 'x') {
+        candidate.x = Math.max(-wallDim.width / 2 + halfW + m, Math.min(wallDim.width / 2 - halfW - m, candidate.x));
+    } else if (prop === 'y') {
+        if (candidate.type !== 'door') {
+            candidate.y = Math.max(halfH + m, Math.min(wallDim.height - halfH - m, candidate.y));
+        }
+    }
+
+    if (isValidAperture(candidate)) {
+        const index = apertures.findIndex(a => a.id === candidate.id);
+        if (index !== -1) {
+            apertures[index] = candidate;
+            selectedApertureData = candidate;
+            showPropertiesPanel(candidate); // Updates inputs visually if it was clamped
+            updateBuilding();
+        }
+    } else {
+        // Restore previous valid info in the inputs
+        showConstraintAlert(`Invalid dimension or position overlap.`, 'error');
+        showPropertiesPanel(selectedApertureData); 
+    }
+};
 
 function showConstraintAlert(message, type = 'error') {
     let overlay = document.getElementById('canvas-overlay');
@@ -544,7 +532,7 @@ function showConstraintAlert(message, type = 'error') {
 
 function selectAperture(data) {
     selectedApertureData = data;
-    showTransformHUD(data);
+    showPropertiesPanel(data);
     updateBuilding(); // Triggers the swap from global to local measurements
 
     // Camera Focus Magic
@@ -558,11 +546,10 @@ function selectAperture(data) {
     };
 
     if (views[data.wallId]) {
-        // Rotate to face the wall
         targetAngle = views[data.wallId][0];
         targetVerticalAngle = views[data.wallId][1];
         
-        // Zoom in (Scale zoom based on aperture size so large double doors don't clip)
+        // Zoom in
         const maxDim = Math.max(data.w, data.h);
         targetRadius = Math.max(7.5, maxDim * 3.5);
     }
@@ -570,29 +557,15 @@ function selectAperture(data) {
 
 function deselectAperture() {
     selectedApertureData = null;
-    hideTransformHUD();
+    hidePropertiesPanel();
     updateBuilding(); // Brings the exterior measurements back
-    fitCamera(); // Zooms the camera back out to view the whole building
+    fitCamera(); // Zooms the camera back out
 }
 
 window.deleteSelectedAperture = function() {
     if (!selectedApertureData) return;
     window.removeAperture(selectedApertureData.id);
     deselectAperture();
-};
-
-window.startMove = function() {
-    if (!selectedApertureData) return;
-    isDraggingAperture = true;
-    resizeMode = null;
-    document.body.classList.add('dragging-aperture');
-};
-
-window.startResize = function(mode) {
-    if (!selectedApertureData) return;
-    resizeMode = mode;
-    isDraggingAperture = false;
-    document.body.classList.add(mode === 'width' ? 'resizing-width' : 'resizing-height');
 };
 
 window.removeAperture = function(id) {
@@ -606,7 +579,7 @@ function resetApertures() {
     apertures = [];
     apertureComponents = {};
     selectedApertureData = null;
-    hideTransformHUD();
+    hidePropertiesPanel();
     updateApertureList();
     updateQuickStats();
     updateBuilding();
@@ -772,15 +745,13 @@ function buildApertureComponents(wallId, wallMesh, buildingGroup) {
         group.translateY(aperture.y);
         group.translateZ(wallThickness / 2);
         if (isSelected) {
-            const dOffset = 0.25; // How far the line sits from the frame
+            const dOffset = 0.25; 
             
-            // Top dimension (Width)
             const p1Top = new THREE.Vector3(-aperture.w / 2, aperture.h / 2, 0);
             const p2Top = new THREE.Vector3(aperture.w / 2, aperture.h / 2, 0);
             const upDir = new THREE.Vector3(0, 1, 0);
             group.add(createDimensionLine(p1Top, p2Top, upDir, dOffset, aperture.w.toFixed(2) + 'm'));
 
-            // Left dimension (Height)
             const p1Left = new THREE.Vector3(-aperture.w / 2, -aperture.h / 2, 0);
             const p2Left = new THREE.Vector3(-aperture.w / 2, aperture.h / 2, 0);
             const leftDir = new THREE.Vector3(-1, 0, 0);
@@ -876,13 +847,12 @@ function createRoof(roofType, shape, buildingGroup, roofMaterial, isLShape = fal
     }
 }
 
-// NEW FUNCTION: Force all apertures to respect new wall boundaries and prevent overlaps
+// Ensure all apertures respect wall boundaries
 function clampAllApertures() {
-    const m = 0.02; // Edge margin to prevent Earcut crashes
-    const minWindowW = 0.3; // Minimum window width before we stop shrinking
-    const pad = 0.02; // Gap between apertures to prevent overlaps
+    const m = 0.02; 
+    const minWindowW = 0.3; 
+    const pad = 0.02; 
 
-    // Group apertures by wall so we only resolve collisions on the same plane
     const wallGroups = {};
     apertures.forEach(ap => {
         if (!wallGroups[ap.wallId]) wallGroups[ap.wallId] = [];
@@ -893,7 +863,6 @@ function clampAllApertures() {
         let aps = wallGroups[wallId];
         const wallDim = getWallDimensions(wallId);
 
-        // 1. Initial size clamp (Heights and Y positions)
         aps.forEach(ap => {
             if (ap.h > wallDim.height - m * 2) {
                 ap.h = Math.max(0.3, wallDim.height - m * 2);
@@ -907,16 +876,13 @@ function clampAllApertures() {
             }
         });
 
-        // 2. Sort left-to-right by X position for spatial packing
         aps.sort((a, b) => a.x - b.x);
 
-        // 3. If cumulative width is too large, shrink WINDOWS only
         let totalRequiredW = aps.reduce((sum, ap) => sum + ap.w, 0) + (aps.length + 1) * pad;
         if (totalRequiredW > wallDim.width) {
             let deficit = totalRequiredW - wallDim.width;
             let shrinkableWindows = aps.filter(ap => ap.type === 'window' && ap.w > minWindowW);
             
-            // Iteratively shrink windows until they fit or hit their absolute minimum size
             while (deficit > 0.01 && shrinkableWindows.length > 0) {
                 let share = deficit / shrinkableWindows.length;
                 for (let i = 0; i < shrinkableWindows.length; i++) {
@@ -924,14 +890,12 @@ function clampAllApertures() {
                     let newW = Math.max(minWindowW, ap.w - share);
                     let saved = ap.w - newW;
                     ap.w = newW;
-                    deficit -= saved; // Deduct the saved width from our deficit
+                    deficit -= saved; 
                 }
-                // Re-evaluate which windows can still be shrunk for the next pass
                 shrinkableWindows = aps.filter(ap => ap.type === 'window' && ap.w > minWindowW);
             }
         }
 
-        // 4. Pack left-to-right (Push overlaps safely to the right)
         let currentX = -wallDim.width / 2 + m;
         for (let i = 0; i < aps.length; i++) {
             let ap = aps[i];
@@ -942,7 +906,6 @@ function clampAllApertures() {
             currentX = ap.x + halfW + pad;
         }
 
-        // 5. Pack right-to-left (If L-to-R pushed them off the right edge, push back)
         let currentRightX = wallDim.width / 2 - m;
         for (let i = aps.length - 1; i >= 0; i--) {
             let ap = aps[i];
@@ -956,7 +919,7 @@ function clampAllApertures() {
 }
 
 function updateBuilding() {
-    clampAllApertures(); // Run the boundary sweep BEFORE generating geometry
+    clampAllApertures(); 
 
     if (building) {
         scene.remove(building);
@@ -1080,7 +1043,6 @@ function updateBuilding() {
 
     applyWallVisibility();
     building = buildingGroup;
-    // Measurements are added after the building is fully constructed to ensure they are on top and not affected by geometry changes during construction
     if (showMeasurements && !selectedApertureData) {
         addMeasurements(buildingGroup);
     }
@@ -1143,29 +1105,24 @@ window.updateDim = function (prop, val) {
     let newVal = parseFloat(val);
     let oldW = W, oldD = D;
 
-    // 1. Temporarily apply the new dimension to test it
     if (prop === "W") W = newVal;
     if (prop === "D") D = newVal;
 
-    // 2. Validate if the new dimensions can support the existing apertures
     let isValid = true;
-    const m = 0.02; // Edge margin
-    const pad = 0.02; // Padding between apertures
-    const minWindowW = 0.3; // Minimum window width
+    const m = 0.02; 
+    const pad = 0.02; 
+    const minWindowW = 0.3; 
 
-    // Group apertures by wall
     const wallGroups = {};
     apertures.forEach(ap => {
         if (!wallGroups[ap.wallId]) wallGroups[ap.wallId] = [];
         wallGroups[ap.wallId].push(ap);
     });
 
-    // Check every wall to see if it violates the physical limits
     for (const wallId in wallGroups) {
         let aps = wallGroups[wallId];
-        const wallDim = getWallDimensions(wallId); // Uses the newly applied W/D
+        const wallDim = getWallDimensions(wallId); 
 
-        // Calculate absolute minimum required physical width for this wall
         let minRequiredWidth = (m * 2) + (aps.length > 1 ? (aps.length - 1) * pad : 0);
         aps.forEach(ap => {
             minRequiredWidth += (ap.type === 'door' ? ap.w : minWindowW);
@@ -1173,24 +1130,21 @@ window.updateDim = function (prop, val) {
 
         if (wallDim.width < minRequiredWidth) {
             isValid = false;
-            break; // Stop checking, we found a violation
+            break; 
         }
     }
 
-    // 3. If invalid, revert the dimension and alert the user
     if (!isValid) {
         W = oldW;
         D = oldD;
         
-        // Ensure the input/slider visually reverts to the valid value
         const inputElement = document.getElementById(`${prop.toLowerCase()}-slider`) || document.getElementById(`input-${prop.toLowerCase()}`);
         if (inputElement) inputElement.value = (prop === 'W' ? W : D);
         
         showConstraintAlert(`Cannot shrink further. Remove or resize doors first.`, 'error');
-        return; // Abort the rest of the update
+        return; 
     }
 
-    // 4. If valid, proceed with the update as normal
     const label = document.getElementById(`val-${prop.toLowerCase()}`);
     if (label) label.innerText = newVal;
     
@@ -1292,7 +1246,6 @@ function animate() {
     camera.position.y = radius * Math.sin(currentVerticalAngle) + H / 2;
     camera.lookAt(0, H / 2, 0);
     
-    updateTransformHUDPosition();
     renderer.render(scene, camera);
 }
 
