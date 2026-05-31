@@ -59,6 +59,39 @@ const APERTURE_PRESETS = {
     }
 };
 
+// UI Sync to ensure view-controls are correctly displayed based on current state
+function syncUI(forceRefresh = false) {
+    // Cache DOM lookups (rebuild on demand)
+    if (forceRefresh || !syncUI._cache) {
+        const cache = { wallButtons: {}, roofButton: null };
+        document.querySelectorAll('[onclick]').forEach(el => {
+            const attr = el.getAttribute('onclick') || '';
+            const wallMatch = attr.match(/toggleWall\(\s*['"]([^'"]+)['"]/);
+            if (wallMatch) {
+                cache.wallButtons[wallMatch[1]] = el;
+                return;
+            }
+            if (/toggleRoof\(/.test(attr)) {
+                cache.roofButton = el;
+            }
+        });
+        syncUI._cache = cache;
+    }
+
+    const { wallButtons, roofButton } = syncUI._cache;
+
+    // Apply states with minimal DOM ops
+    Object.keys(wallVisibility).forEach(wallId => {
+        const btn = wallButtons[wallId];
+        if (!btn) return;
+        btn.classList.toggle('active', !!wallVisibility[wallId]);
+    });
+
+    if (roofButton) roofButton.classList.toggle('active', !!showRoof);
+    const measurementsButton = document.querySelector('[onclick*="toggleMeasurements("]');
+    if (measurementsButton) measurementsButton.classList.toggle('active', !!showMeasurements);
+}
+
 window.toggleLibraryCategory = function(header) {
     const category = header.parentElement;
     if (category) category.classList.toggle('expanded');
@@ -1223,6 +1256,7 @@ window.rotateTo = function (view, e) {
         left: [-Math.PI / 2, 0], top: [0, 1.5], iso: [-Math.PI / 4, 0.25],
     };
     if (views[view]) [targetAngle, targetVerticalAngle] = views[view];
+    syncUI();
 };
 
 window.setExterior = function(type, e) {
