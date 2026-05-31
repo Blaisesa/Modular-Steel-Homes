@@ -195,7 +195,7 @@ input[type="range"] {
     transition: all 0.3s var(--ease-out-snappy);
 }
 
-/* VIEW CONTROLS */
+/* VIEW CONTROLS (Updated Panel UI) */
 
 .view-controls {
     position: absolute; 
@@ -203,63 +203,78 @@ input[type="range"] {
     right: 20px;
     display: flex; 
     flex-direction: column; 
-    gap: 6px; 
+    gap: 8px; 
     z-index: 5;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 12px;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.vc-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+    text-align: center;
+    margin-top: 4px;
+    margin-bottom: 2px;
+}
+
+.vc-row {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
 }
 
 .view-controls button {
-    width: 44px; 
-    height: 44px; 
-    background: rgba(255, 255, 255, 0.85);
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    border-radius: 12px; 
+    width: 36px; 
+    height: 36px; 
+    background: white;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 8px; 
     cursor: pointer; 
     font-weight: 600;
     font-size: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.06);
-    backdrop-filter: blur(10px);
-    transition: all 0.2s var(--ease-out-snappy);
     color: var(--text-dark);
+    transition: all 0.2s var(--ease-out-snappy);
+}
+
+.view-controls button.vc-wide {
+    flex: 1;
+    width: auto;
 }
 
 .view-controls button:hover { 
-    background: rgba(255, 255, 255, 0.95);
+    background: #f8f9fa;
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
 }
 
 .view-controls button:active {
     transform: translateY(0);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
 }
 
 .view-controls button.active {
     background: var(--accent-color);
     color: white;
     border-color: var(--accent-color);
-    box-shadow: 0 6px 20px rgba(0, 123, 255, 0.25);
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.25);
 }
 
-.control-divider {
+.vc-divider {
     height: 1px;
-    background: rgba(255, 255, 255, 0.3);
-    margin: 4px 10px;
-}
-
-.wall-toggle-controls {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    margin-top: 8px;
-}
-
-.wall-toggle-controls button {
-    font-size: 10px;
-    height: 32px;
-    font-weight: 500;
+    background: rgba(0, 0, 0, 0.08);
+    margin: 4px 0;
+    width: 100%;
 }
 
 /* ZOOM SLIDER */

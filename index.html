@@ -176,22 +176,34 @@
         <main id="builder-viewport"></main>
 
         <div class="view-controls">
-            <button id="roam-toggle" onclick="toggleFreeRoam()" title="Toggle Lock">🔒</button>
-            <button id="measurements-toggle" class="view-btn active" onclick="window.toggleMeasurements(event)" title="Toggle Measurements">📏</button>
-            <button id="roof-toggle" onclick="toggleRoof()" title="Toggle Roof Visibility">🏠</button>
-            <div class="control-divider"></div>
-            <button onclick="rotateTo('iso')">3D</button>
-            <div class="control-divider"></div>
-            <button onclick="rotateTo('top')">Top</button>
-            <button onclick="rotateTo('front')">Front</button>
-            <button onclick="rotateTo('back')">Back</button>
-            <button onclick="rotateTo('left')">Left</button>
-            <button onclick="rotateTo('right')">Right</button>
-            <div class="wall-toggle-controls">
-                <button onclick="toggleWall('front')">🧱 Front</button>
-                <button onclick="toggleWall('back')">🧱 Back</button>
-                <button onclick="toggleWall('left')">🧱 Left</button>
-                <button onclick="toggleWall('right')">🧱 Right</button>
+            <div class="vc-row">
+                <button id="roam-toggle" onclick="toggleFreeRoam()" title="Toggle Lock">🔒</button>
+                <button id="measurements-toggle" class="active" onclick="window.toggleMeasurements(event)" title="Toggle Measurements">📏</button>
+                <button id="roof-toggle" class="active" onclick="toggleRoof(event)" title="Toggle Roof Visibility">🏠</button>
+            </div>
+            
+            <div class="vc-divider"></div>
+            
+            <div class="vc-label">Camera</div>
+            <div class="vc-row">
+                <button onclick="rotateTo('iso', event)" class="active vc-wide">3D</button>
+                <button onclick="rotateTo('top', event)" class="vc-wide">Top</button>
+            </div>
+            <div class="vc-row">
+                <button onclick="rotateTo('front', event)" title="Front">F</button>
+                <button onclick="rotateTo('back', event)" title="Back">B</button>
+                <button onclick="rotateTo('left', event)" title="Left">L</button>
+                <button onclick="rotateTo('right', event)" title="Right">R</button>
+            </div>
+
+            <div class="vc-divider"></div>
+
+            <div class="vc-label">Walls 🧱</div>
+            <div class="vc-row">
+                <button onclick="toggleWall('front', event)" class="active" title="Toggle Front Wall">F</button>
+                <button onclick="toggleWall('back', event)" class="active" title="Toggle Back Wall">B</button>
+                <button onclick="toggleWall('left', event)" class="active" title="Toggle Left Wall">L</button>
+                <button onclick="toggleWall('right', event)" class="active" title="Toggle Right Wall">R</button>
             </div>
         </div>
 
